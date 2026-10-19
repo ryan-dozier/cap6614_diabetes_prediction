@@ -62,6 +62,69 @@ conda env export --no-builds | grep -v '^prefix:' > environment.yml
 python3 -m pip freeze > requirements-local.txt
 ```
 
+## Initial Project Setup
+
+After creating and activating the Conda environment, the project can be initialized using the setup script in `scripts/`.
+
+First, activate the project environment:
+
+```bash
+conda activate synthetic-tabular-ai
+```
+
+Then run:
+
+```bash
+./scripts/initial_setup.sh
+```
+
+If the script is not executable, run:
+
+```bash
+chmod +x scripts/initial_setup.sh
+./scripts/initial_setup.sh
+```
+
+The setup script performs the following checks and initialization steps:
+
+1. Verifies that the active Conda environment is `synthetic-tabular-ai`.
+2. Verifies that Python 3.11 is being used.
+3. Checks that the required raw datasets are present:
+   - `data/raw/source/diabetes_dataset.csv`
+   - `data/raw/kaggle_s5e12/train.csv`
+4. Runs `src/prepare_data.py` to:
+   - validate the raw datasets;
+   - create the canonical shared-feature datasets;
+   - generate the fixed train/validation/test splits; and
+   - write preparation metadata.
+5. Runs `src/data.py` as a smoke test to verify that the prepared datasets, schema, and fixed splits can be loaded correctly.
+
+A successful setup ends with:
+
+```text
+========================================
+Setup complete.
+========================================
+```
+
+The setup script does **not** run the research experiments such as the domain classifier, distribution-shift analysis, or feature-ablation experiments. Those should be run separately as needed.
+
+### Expected Setup Order
+
+For a new checkout of the repository:
+
+```bash
+conda env create -f environment.yml
+conda activate synthetic-tabular-ai
+./scripts/initial_setup.sh
+```
+
+If the Conda environment already exists, only the final two commands are required:
+
+```bash
+conda activate synthetic-tabular-ai
+./scripts/initial_setup.sh
+```
 
 ## Scripts and Workflow
 

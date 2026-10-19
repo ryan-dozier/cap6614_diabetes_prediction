@@ -63,3 +63,323 @@ python3 -m pip freeze > requirements-local.txt
 ```
 
 
+## Scripts and Workflow
+
+The scripts in `src/` form the data preparation and distribution-shift analysis pipeline used by the project. Unless otherwise noted, commands should be run from the project root.
+
+A typical workflow is:
+
+```text
+inspect_datasets.py
+        ↓
+prepare_data.py
+        ↓
+data.py
+        ↓
+domain_classifier.py
+        ↓
+analyze_distribution_shift.py
+        ↓
+domain_feature_ablation.py
+```
+
+### `src/inspect_datasets.py`
+
+Performs an initial inspection of the raw source and Kaggle datasets.
+
+The script:
+
+- reports dataset shapes and target distributions;
+- identifies features shared between the two datasets;
+- identifies source-only and Kaggle-only columns;
+- checks missing values and data types;
+- separates categorical and numeric features;
+- verifies that categorical features use compatible category values;
+- compares numeric means and standard deviations; and
+- reports standardized mean differences as an initial estimate of distribution shift.
+
+Run with:
+
+```bash
+python3 src/inspect_datasets.py
+```
+
+This script is primarily a diagnostic tool and does not modify the datasets.
+
+---
+
+### `src/prepare_data.py`
+
+Creates the canonical datasets used by the experiments.
+
+The project uses the 24 predictors shared by the source and Kaggle datasets. Source-only variables and the Kaggle `id` column are excluded from the normal cross-domain feature space.
+
+The script:
+
+- validates the raw dataset schemas;
+- enforces the frozen shared-feature schema;
+- validates numeric values and categorical vocabularies;
+- checks for missing values and duplicate rows;
+- creates canonical source and Kaggle datasets;
+- creates deterministic stratified train/validation/test splits using seed `42`;
+- preserves original row identity through split-assignment files; and
+- records dataset metadata and raw-file hashes for reproducibility.
+
+The fixed split proportions are:
+
+```text
+70% training
+15% validation
+15% test
+```
+
+Run with:
+
+```bash
+python3 src/prepare_data.py
+```
+
+Generated data is written under:
+
+```text
+data/processed/
+data/splits/
+```
+
+This script should be run before any experiment scripts.
+
+---
+
+### `src/data.py`
+
+Provides the common data-loading interface used by the experiment scripts.
+
+Rather than having each experiment read CSV files independently, `data.py` loads and validates the canonical datasets and their fixed split assignments.
+
+Important functions include:
+
+```python
+load_metadata()
+load_schema()
+load_common(domain)
+load_split_assignments(domain)
+load_split(domain, split)
+load_xy(domain, split)
+split_summary(domain, split)
+```
+
+The module intentionally performs **no learned preprocessing**. It does not:
+
+```text
+encode categorical variables
+scale numeric variables
+impute values
+select features
+rebalance classes
+```
+
+Any preprocessing required by a particular model should be fitted using that experiment's training data only.
+
+The module can also be executed directly as a smoke test:
+
+```bash
+python3 src/data.py
+```
+
+This verifies the prepared schema, fixed splits, and feature/target loading.
+
+---
+
+### `src/domain_classifier.py`
+
+Measures how easily the source and Kaggle-generated distributions can be distinguished.
+
+The script constructs a balanced binary domain-classification problem:
+
+```text
+domain = 0 -> source dataset
+domain = 1 -> Kaggle-generated dataset
+```
+
+For each train, validation, and test partition, Kaggle examples are deterministically downsampled to match the number of source examples.
+
+Only the 24 shared predictors are provided to the classifier. The following are explicitly excluded from model input:
+
+```text
+diagnosed_diabetes
+id
+row_index
+```
+
+A CatBoost classifier is trained using native handling of categorical features and validation-based early stopping.
+
+The experiment reports metrics including:
+
+```text
+ROC-AUC
+accuracy
+log loss
+precision
+recall
+F1
+```
+
+It also calculates feature importance to identify predictors that contain the strongest domain-specific signal.
+
+Run with:
+
+```bash
+python3 src/domain_classifier.py
+```
+
+Outputs are written to:
+
+```text
+results/domain_classifier/
+├── domain_classifier.cbm
+├── metrics.json
+├── feature_importance.csv
+├── test_predictions.csv
+└── sampling_provenance.csv.gz
+```
+
+`sampling_provenance.csv.gz` records the exact source and Kaggle rows used in the balanced domain experiment so later experiments can reproduce the same samples.
+
+---
+
+### `src/analyze_distribution_shift.py`
+
+Performs a more detailed statistical analysis of the differences between the source and Kaggle distributions.
+
+For numeric features, the analysis includes:
+
+```text
+standardized mean difference
+standard-deviation ratio
+variance distortion
+Kolmogorov-Smirnov statistic
+Wasserstein distance
+normalized Wasserstein distance
+distribution quantiles
+```
+
+Binary numeric indicators also receive explicit prevalence comparisons.
+
+For categorical features, the analysis includes:
+
+```text
+category frequencies
+total variation distance
+Jensen-Shannon distance/divergence
+category-level frequency differences
+```
+
+The statistical shift measures are combined with the feature importance produced by `domain_classifier.py`. Spearman rank correlations are also calculated to examine how closely learned domain importance agrees with individual statistical measures of distribution shift.
+
+Run with:
+
+```bash
+python3 src/analyze_distribution_shift.py
+```
+
+Outputs are written to:
+
+```text
+results/distribution_shift/
+├── numeric_shift.csv
+├── categorical_shift.csv
+├── categorical_frequencies.csv
+├── combined_feature_shift.csv
+├── metric_correlations.csv
+├── metadata.json
+└── figures/
+```
+
+Statistical calculations use the complete prepared datasets. Plotting may use deterministic subsampling for efficiency.
+
+---
+
+### `src/domain_feature_ablation.py`
+
+Measures how domain separability changes when the most domain-discriminative features are progressively removed.
+
+The experiment uses three fixed feature-removal rankings:
+
+```text
+domain_importance
+ks_statistic
+variance_distortion
+```
+
+For each ranking, the top:
+
+```text
+1
+3
+5
+10
+```
+
+features are removed and the CatBoost domain classifier is retrained.
+
+To avoid test-set leakage:
+
+- the domain-importance ranking comes from the original domain classifier;
+- KS rankings are calculated using only the reconstructed domain-training split; and
+- variance-distortion rankings are calculated using only the reconstructed domain-training split.
+
+The exact balanced samples from the original domain-classifier experiment are reconstructed from `sampling_provenance.csv.gz`, allowing feature sets to be compared without introducing additional sampling variation.
+
+The script first reproduces the original 24-feature classifier and verifies that its test ROC-AUC matches the saved baseline before continuing.
+
+Run with:
+
+```bash
+python3 src/domain_feature_ablation.py
+```
+
+Outputs are written to:
+
+```text
+results/domain_feature_ablation/
+├── ablation_results.csv
+├── removed_features.csv
+├── training_ranking_metrics.csv
+├── metadata.json
+└── figures/
+    ├── auc_vs_removed_features.png
+    └── accuracy_vs_removed_features.png
+```
+
+The primary question addressed by this experiment is whether a smaller set of artifact-heavy features accounts for most of the distinguishability between the source and Kaggle-generated datasets.
+
+## Running the Current Analysis Pipeline
+
+Assuming the raw datasets are already present in the expected locations, the current pipeline can be run with:
+
+```bash
+python3 src/inspect_datasets.py
+python3 src/prepare_data.py
+python3 src/data.py
+python3 src/domain_classifier.py
+python3 src/analyze_distribution_shift.py
+python3 src/domain_feature_ablation.py
+```
+
+`inspect_datasets.py` and `data.py` are primarily diagnostic checks.
+
+The required dependency chain for the current experiments is:
+
+```text
+prepare_data.py
+    ↓
+domain_classifier.py
+    ↓
+analyze_distribution_shift.py
+
+prepare_data.py
+    ↓
+domain_classifier.py
+    ↓
+domain_feature_ablation.py
+```

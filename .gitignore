@@ -5,6 +5,8 @@
 /data/processed/
 /data/splits/
 
+# NHANES raw data
+/data/raw/nhanes_2015_2016/
 
 # =============================================================================
 # Generated experiment results

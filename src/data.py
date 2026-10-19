@@ -15,11 +15,45 @@ import pandas as pd
 # Types
 # =============================================================================
 
-Domain = Literal["source", "kaggle"]
+Domain = Literal["source", "kaggle", "nhanes"]
 Split = Literal["train", "val", "test"]
+FeatureSet = Literal[
+    "full_24",
+    "strict_common_16",
+    "common_20",
+    "common_22",
+]
 
-VALID_DOMAINS = ("source", "kaggle")
-VALID_SPLITS = ("train", "val", "test")
+VALID_DOMAINS = (
+    "source",
+    "kaggle",
+    "nhanes",
+)
+
+VALID_SPLITS = (
+    "train",
+    "val",
+    "test",
+)
+
+VALID_FEATURE_SETS = (
+    "full_24",
+    "strict_common_16",
+    "common_20",
+    "common_22",
+)
+
+DEFAULT_FEATURE_SET = {
+    "source": "full_24",
+    "kaggle": "full_24",
+    "nhanes": "strict_common_16",
+}
+
+NHANES_FEATURE_SETS = {
+    "strict_common_16",
+    "common_20",
+    "common_22",
+}
 
 
 # =============================================================================
@@ -31,16 +65,45 @@ ROOT = Path(__file__).resolve().parents[1]
 PROCESSED_DIR = ROOT / "data/processed"
 SPLITS_DIR = ROOT / "data/splits"
 
-METADATA_PATH = PROCESSED_DIR / "metadata.json"
+METADATA_PATH = (
+    PROCESSED_DIR / "metadata.json"
+)
+
+NHANES_METADATA_PATH = (
+    ROOT
+    / "results"
+    / "nhanes_preparation"
+    / "metadata.json"
+)
 
 COMMON_PATHS = {
-    "source": PROCESSED_DIR / "source_common.csv",
-    "kaggle": PROCESSED_DIR / "kaggle_common.csv",
+    "source":
+        PROCESSED_DIR / "source_common.csv",
+
+    "kaggle":
+        PROCESSED_DIR / "kaggle_common.csv",
+}
+
+NHANES_COMMON_PATHS = {
+    "strict_common_16":
+        PROCESSED_DIR / "nhanes_common_16.csv",
+
+    "common_20":
+        PROCESSED_DIR / "nhanes_common_20.csv",
+
+    "common_22":
+        PROCESSED_DIR / "nhanes_common_22.csv",
 }
 
 SPLIT_ASSIGNMENT_PATHS = {
-    "source": SPLITS_DIR / "source_split_assignments.csv",
-    "kaggle": SPLITS_DIR / "kaggle_split_assignments.csv",
+    "source":
+        SPLITS_DIR / "source_split_assignments.csv",
+
+    "kaggle":
+        SPLITS_DIR / "kaggle_split_assignments.csv",
+
+    "nhanes":
+        SPLITS_DIR / "nhanes_split_assignments.csv",
 }
 
 
@@ -59,7 +122,10 @@ class DatasetSchema:
 
     @property
     def model_columns(self) -> tuple[str, ...]:
-        return self.features + (self.target,)
+        return (
+            self.features
+            + (self.target,)
+        )
 
 
 # =============================================================================
@@ -67,7 +133,9 @@ class DatasetSchema:
 # =============================================================================
 
 
-def _validate_domain(domain: str) -> Domain:
+def _validate_domain(
+    domain: str,
+) -> Domain:
     if domain not in VALID_DOMAINS:
         raise ValueError(
             f"Unknown domain '{domain}'. "
@@ -77,7 +145,9 @@ def _validate_domain(domain: str) -> Domain:
     return domain  # type: ignore[return-value]
 
 
-def _validate_split(split: str) -> Split:
+def _validate_split(
+    split: str,
+) -> Split:
     if split not in VALID_SPLITS:
         raise ValueError(
             f"Unknown split '{split}'. "
@@ -87,13 +157,55 @@ def _validate_split(split: str) -> Split:
     return split  # type: ignore[return-value]
 
 
-def _require_file(path: Path) -> None:
+def _validate_feature_set(
+    feature_set: str,
+) -> FeatureSet:
+    if feature_set not in VALID_FEATURE_SETS:
+        raise ValueError(
+            f"Unknown feature set '{feature_set}'. "
+            f"Expected one of: {VALID_FEATURE_SETS}"
+        )
+
+    return feature_set  # type: ignore[return-value]
+
+
+def _resolve_feature_set(
+    domain: Domain,
+    feature_set: str | None,
+) -> FeatureSet:
+    if feature_set is None:
+        feature_set = DEFAULT_FEATURE_SET[
+            domain
+        ]
+
+    resolved = _validate_feature_set(
+        feature_set
+    )
+
+    if (
+        domain == "nhanes"
+        and resolved not in NHANES_FEATURE_SETS
+    ):
+        raise ValueError(
+            "NHANES does not support feature_set='full_24'. "
+            "Use one of: "
+            "'strict_common_16', 'common_20', 'common_22'."
+        )
+
+    return resolved
+
+
+def _require_file(
+    path: Path,
+    *,
+    preparation_hint: str,
+) -> None:
     if not path.exists():
         raise FileNotFoundError(
-            f"Required prepared-data file does not exist:\n"
+            "Required prepared-data file does not exist:\n"
             f"  {path}\n\n"
             "Run:\n"
-            "  python3 src/prepare_data.py\n"
+            f"  {preparation_hint}\n"
             "before running experiments."
         )
 
@@ -105,7 +217,12 @@ def _require_file(path: Path) -> None:
 
 @lru_cache(maxsize=1)
 def _load_metadata_cached() -> dict:
-    _require_file(METADATA_PATH)
+    _require_file(
+        METADATA_PATH,
+        preparation_hint=(
+            "python3 src/prepare_data.py"
+        ),
+    )
 
     with METADATA_PATH.open("r") as file:
         metadata = json.load(file)
@@ -117,12 +234,17 @@ def _load_metadata_cached() -> dict:
         "datasets",
     }
 
-    missing = required_keys - set(metadata)
+    missing = (
+        required_keys
+        - set(metadata)
+    )
 
     if missing:
         raise ValueError(
             "Prepared-data metadata is missing required keys: "
-            + ", ".join(sorted(missing))
+            + ", ".join(
+                sorted(missing)
+            )
         )
 
     return metadata
@@ -130,78 +252,590 @@ def _load_metadata_cached() -> dict:
 
 def load_metadata() -> dict:
     """
-    Return preparation metadata.
+    Return Source/Kaggle preparation metadata.
 
     A deep copy is returned so experiment code cannot accidentally modify the
     cached metadata object.
     """
-    return copy.deepcopy(_load_metadata_cached())
+
+    return copy.deepcopy(
+        _load_metadata_cached()
+    )
+
+
+@lru_cache(maxsize=1)
+def _load_nhanes_metadata_cached() -> dict:
+    _require_file(
+        NHANES_METADATA_PATH,
+        preparation_hint=(
+            "python3 src/prepare_nhanes.py"
+        ),
+    )
+
+    with NHANES_METADATA_PATH.open(
+        "r"
+    ) as file:
+        metadata = json.load(file)
+
+    required_keys = {
+        "dataset",
+        "target",
+        "primary_feature_set",
+        "feature_sets",
+        "primary_splits",
+    }
+
+    missing = (
+        required_keys
+        - set(metadata)
+    )
+
+    if missing:
+        raise ValueError(
+            "NHANES metadata is missing required keys: "
+            + ", ".join(
+                sorted(missing)
+            )
+        )
+
+    return metadata
+
+
+def load_nhanes_metadata() -> dict:
+    """
+    Return NHANES preparation metadata.
+    """
+
+    return copy.deepcopy(
+        _load_nhanes_metadata_cached()
+    )
 
 
 @lru_cache(maxsize=1)
 def load_schema() -> DatasetSchema:
-    metadata = _load_metadata_cached()
+    """
+    Return the original Source/Kaggle 24-feature schema.
 
-    features = metadata["features"]
+    This preserves the existing API used by the synthetic-domain analysis
+    scripts. For feature-set-specific schemas, call load_feature_schema().
+    """
+
+    metadata = (
+        _load_metadata_cached()
+    )
+
+    features = metadata[
+        "features"
+    ]
 
     return DatasetSchema(
         target=metadata["target"],
-        features=tuple(features["all_shared"]),
-        categorical_features=tuple(features["categorical"]),
-        numeric_features=tuple(features["numeric"]),
+        features=tuple(
+            features["all_shared"]
+        ),
+        categorical_features=tuple(
+            features["categorical"]
+        ),
+        numeric_features=tuple(
+            features["numeric"]
+        ),
         source_only_excluded=tuple(
-            features["source_only_excluded"]
+            features[
+                "source_only_excluded"
+            ]
         ),
     )
 
 
 # =============================================================================
-# Canonical datasets
+# Feature sets
+# =============================================================================
+
+
+FEATURE_SET_EXCLUSIONS = {
+    "full_24":
+        set(),
+
+    "common_22": {
+        "diet_score",
+        "waist_to_hip_ratio",
+    },
+
+    "common_20": {
+        "diet_score",
+        "waist_to_hip_ratio",
+        "ldl_cholesterol",
+        "triglycerides",
+    },
+
+    "strict_common_16": {
+        "diet_score",
+        "waist_to_hip_ratio",
+        "ldl_cholesterol",
+        "triglycerides",
+        "education_level",
+        "employment_status",
+        "income_level",
+        "screen_time_hours_per_day",
+    },
+}
+
+
+EXPECTED_FEATURE_COUNTS = {
+    "full_24": 24,
+    "common_22": 22,
+    "common_20": 20,
+    "strict_common_16": 16,
+}
+
+
+@lru_cache(maxsize=4)
+def load_feature_schema(
+    feature_set: FeatureSet,
+) -> DatasetSchema:
+    """
+    Return the schema for one named feature set.
+
+    full_24 uses the canonical Source/Kaggle metadata order.
+
+    The three NHANES-compatible feature sets use the ordered feature_names
+    written by prepare_nhanes.py. This makes that metadata the authoritative
+    definition of the cross-domain column order and prevents Source/Kaggle and
+    NHANES from independently reconstructing the same feature set in different
+    orders.
+    """
+
+    feature_set = (
+        _validate_feature_set(
+            feature_set
+        )
+    )
+
+    base = load_schema()
+
+    if feature_set == "full_24":
+        features = base.features
+    else:
+        nhanes_metadata = (
+            _load_nhanes_metadata_cached()
+        )
+
+        feature_info = (
+            nhanes_metadata[
+                "feature_sets"
+            ][feature_set]
+        )
+
+        features = tuple(
+            feature_info[
+                "feature_names"
+            ]
+        )
+
+        unknown_features = [
+            feature
+            for feature in features
+            if feature not in base.features
+        ]
+
+        if unknown_features:
+            raise ValueError(
+                f"{feature_set}: NHANES metadata contains "
+                "features that are not in the canonical "
+                "Source/Kaggle schema: "
+                f"{unknown_features}"
+            )
+
+    expected_count = (
+        EXPECTED_FEATURE_COUNTS[
+            feature_set
+        ]
+    )
+
+    if len(features) != expected_count:
+        raise ValueError(
+            f"{feature_set}: expected "
+            f"{expected_count} features, "
+            f"found {len(features)}."
+        )
+
+    if len(set(features)) != len(features):
+        raise ValueError(
+            f"{feature_set}: duplicate feature names "
+            "were found in the authoritative feature order."
+        )
+
+    categorical = tuple(
+        feature
+        for feature in features
+        if feature
+        in base.categorical_features
+    )
+
+    numeric = tuple(
+        feature
+        for feature in features
+        if feature
+        in base.numeric_features
+    )
+
+    if (
+        len(categorical)
+        + len(numeric)
+        != len(features)
+    ):
+        typed_features = (
+            set(categorical)
+            | set(numeric)
+        )
+
+        untyped = [
+            feature
+            for feature in features
+            if feature not in typed_features
+        ]
+
+        raise ValueError(
+            f"{feature_set}: features are missing "
+            f"type information: {untyped}"
+        )
+
+    return DatasetSchema(
+        target=base.target,
+        features=features,
+        categorical_features=
+            categorical,
+        numeric_features=
+            numeric,
+        source_only_excluded=
+            base.source_only_excluded,
+    )
+
+
+def feature_names(
+    feature_set: FeatureSet,
+) -> tuple[str, ...]:
+    """
+    Return features in authoritative model-column order.
+    """
+
+    return (
+        load_feature_schema(
+            feature_set
+        )
+        .features
+    )
+
+
+# =============================================================================
+# Canonical Source / Kaggle datasets
 # =============================================================================
 
 
 @lru_cache(maxsize=2)
-def _load_common_cached(domain: Domain) -> pd.DataFrame:
-    path = COMMON_PATHS[domain]
-    _require_file(path)
+def _load_source_kaggle_full_cached(
+    domain: Literal[
+        "source",
+        "kaggle",
+    ],
+) -> pd.DataFrame:
+    path = COMMON_PATHS[
+        domain
+    ]
 
-    df = pd.read_csv(path)
+    _require_file(
+        path,
+        preparation_hint=(
+            "python3 src/prepare_data.py"
+        ),
+    )
+
+    df = pd.read_csv(
+        path
+    )
 
     schema = load_schema()
 
-    expected_columns = list(schema.model_columns)
-    actual_columns = list(df.columns)
+    expected_columns = list(
+        schema.model_columns
+    )
 
-    if actual_columns != expected_columns:
+    actual_columns = list(
+        df.columns
+    )
+
+    if (
+        actual_columns
+        != expected_columns
+    ):
         raise ValueError(
-            f"{domain} canonical dataset schema mismatch.\n"
-            f"Expected:\n  {expected_columns}\n"
-            f"Observed:\n  {actual_columns}"
+            f"{domain} canonical dataset "
+            "schema mismatch.\n"
+            f"Expected:\n  "
+            f"{expected_columns}\n"
+            f"Observed:\n  "
+            f"{actual_columns}"
         )
 
-    metadata = _load_metadata_cached()
+    metadata = (
+        _load_metadata_cached()
+    )
 
-    expected_rows = metadata["datasets"][domain]["rows"]
+    expected_rows = metadata[
+        "datasets"
+    ][domain]["rows"]
 
     if len(df) != expected_rows:
         raise ValueError(
-            f"{domain} canonical dataset row-count mismatch. "
-            f"Expected {expected_rows:,}, observed {len(df):,}."
+            f"{domain} canonical dataset "
+            "row-count mismatch. "
+            f"Expected {expected_rows:,}, "
+            f"observed {len(df):,}."
         )
 
     return df
 
 
-def load_common(domain: Domain) -> pd.DataFrame:
-    """
-    Load the complete canonical 24-feature dataset for a domain.
+# =============================================================================
+# NHANES prepared datasets
+# =============================================================================
 
-    This should normally be used for analysis rather than model training.
-    Experiment code should usually call load_split().
-    """
-    domain = _validate_domain(domain)
 
-    return _load_common_cached(domain).copy()
+@lru_cache(maxsize=3)
+def _load_nhanes_feature_set_cached(
+    feature_set: FeatureSet,
+) -> pd.DataFrame:
+    if (
+        feature_set
+        not in NHANES_FEATURE_SETS
+    ):
+        raise ValueError(
+            f"NHANES does not support "
+            f"feature set '{feature_set}'."
+        )
+
+    path = NHANES_COMMON_PATHS[
+        feature_set
+    ]
+
+    _require_file(
+        path,
+        preparation_hint=(
+            "python3 src/prepare_nhanes.py"
+        ),
+    )
+
+    df = pd.read_csv(
+        path
+    )
+
+    schema = (
+        load_feature_schema(
+            feature_set
+        )
+    )
+
+    expected_columns = [
+        "seqn",
+        *schema.features,
+        schema.target,
+    ]
+
+    actual_columns = list(
+        df.columns
+    )
+
+    if (
+        actual_columns
+        != expected_columns
+    ):
+        raise ValueError(
+            f"nhanes/{feature_set} "
+            "schema mismatch.\n"
+            f"Expected:\n  "
+            f"{expected_columns}\n"
+            f"Observed:\n  "
+            f"{actual_columns}"
+        )
+
+    if df["seqn"].isna().any():
+        raise ValueError(
+            f"nhanes/{feature_set}: "
+            "missing SEQN values."
+        )
+
+    if df["seqn"].duplicated().any():
+        raise ValueError(
+            f"nhanes/{feature_set}: "
+            "duplicate SEQN values."
+        )
+
+    if (
+        df[
+            list(
+                schema.model_columns
+            )
+        ]
+        .isna()
+        .any()
+        .any()
+    ):
+        raise ValueError(
+            f"nhanes/{feature_set}: "
+            "complete-case dataset "
+            "contains missing values."
+        )
+
+    metadata = (
+        _load_nhanes_metadata_cached()
+    )
+
+    info = metadata[
+        "feature_sets"
+    ][feature_set]
+
+    expected_features = tuple(
+        info["feature_names"]
+    )
+
+    if (
+        expected_features
+        != schema.features
+    ):
+        raise ValueError(
+            f"nhanes/{feature_set}: "
+            "metadata feature order does "
+            "not match data.py feature order."
+        )
+
+    expected_rows = int(
+        info["rows"]
+    )
+
+    if len(df) != expected_rows:
+        raise ValueError(
+            f"nhanes/{feature_set}: "
+            f"expected {expected_rows:,} "
+            f"rows, observed {len(df):,}."
+        )
+
+    return df
+
+
+def _load_domain_dataset_internal(
+    domain: Domain,
+    feature_set: FeatureSet,
+) -> pd.DataFrame:
+    """
+    Internal loader.
+
+    Source/Kaggle return feature columns + target.
+    NHANES additionally retains SEQN internally.
+    """
+
+    if domain in {
+        "source",
+        "kaggle",
+    }:
+        full = (
+            _load_source_kaggle_full_cached(
+                domain
+            )
+        )
+
+        schema = (
+            load_feature_schema(
+                feature_set
+            )
+        )
+
+        return full[
+            list(
+                schema.model_columns
+            )
+        ]
+
+    return (
+        _load_nhanes_feature_set_cached(
+            feature_set
+        )
+    )
+
+
+def load_common(
+    domain: Domain,
+    *,
+    feature_set: FeatureSet | None = None,
+    include_seqn: bool = False,
+) -> pd.DataFrame:
+    """
+    Load a complete prepared dataset for one domain.
+
+    Defaults
+    --------
+    source/kaggle:
+        full_24
+
+    nhanes:
+        strict_common_16
+
+    For Source/Kaggle this preserves the historical behavior of load_common().
+    NHANES SEQN is excluded by default so it cannot accidentally enter model
+    training; pass include_seqn=True when provenance is needed.
+    """
+
+    domain = (
+        _validate_domain(
+            domain
+        )
+    )
+
+    resolved = (
+        _resolve_feature_set(
+            domain,
+            feature_set,
+        )
+    )
+
+    if (
+        include_seqn
+        and domain != "nhanes"
+    ):
+        raise ValueError(
+            "include_seqn=True is only "
+            "valid for the NHANES domain."
+        )
+
+    df = (
+        _load_domain_dataset_internal(
+            domain,
+            resolved,
+        )
+        .copy()
+    )
+
+    schema = (
+        load_feature_schema(
+            resolved
+        )
+    )
+
+    if domain == "nhanes":
+        columns = [
+            *(
+                ["seqn"]
+                if include_seqn
+                else []
+            ),
+            *schema.features,
+            schema.target,
+        ]
+
+        return df[
+            columns
+        ].copy()
+
+    return df
 
 
 # =============================================================================
@@ -210,13 +844,28 @@ def load_common(domain: Domain) -> pd.DataFrame:
 
 
 @lru_cache(maxsize=2)
-def _load_assignments_cached(
-    domain: Domain,
+def _load_source_kaggle_assignments_cached(
+    domain: Literal[
+        "source",
+        "kaggle",
+    ],
 ) -> pd.DataFrame:
-    path = SPLIT_ASSIGNMENT_PATHS[domain]
-    _require_file(path)
+    path = (
+        SPLIT_ASSIGNMENT_PATHS[
+            domain
+        ]
+    )
 
-    assignments = pd.read_csv(path)
+    _require_file(
+        path,
+        preparation_hint=(
+            "python3 src/prepare_data.py"
+        ),
+    )
+
+    assignments = pd.read_csv(
+        path
+    )
 
     required_columns = {
         "row_index",
@@ -224,66 +873,261 @@ def _load_assignments_cached(
     }
 
     if domain == "kaggle":
-        required_columns.add("id")
+        required_columns.add(
+            "id"
+        )
 
-    missing = required_columns - set(assignments.columns)
+    missing = (
+        required_columns
+        - set(
+            assignments.columns
+        )
+    )
 
     if missing:
         raise ValueError(
-            f"{domain} split assignments are missing columns: "
-            + ", ".join(sorted(missing))
+            f"{domain} split assignments "
+            "are missing columns: "
+            + ", ".join(
+                sorted(missing)
+            )
         )
 
-    common = _load_common_cached(domain)
+    common = (
+        _load_source_kaggle_full_cached(
+            domain
+        )
+    )
 
     if len(assignments) != len(common):
         raise ValueError(
-            f"{domain} split-assignment row count does not match "
-            f"the canonical dataset."
+            f"{domain} split-assignment "
+            "row count does not match "
+            "the canonical dataset."
         )
 
-    # prepare_data.py writes one assignment row per original dataset row,
-    # ordered by original row_index.
-    row_indices = assignments["row_index"].to_numpy()
+    row_indices = (
+        assignments[
+            "row_index"
+        ]
+        .to_numpy()
+    )
 
-    expected_indices = np.arange(len(common))
+    expected_indices = np.arange(
+        len(common)
+    )
 
     if not np.array_equal(
         row_indices,
         expected_indices,
     ):
         raise ValueError(
-            f"{domain} split assignments do not contain the expected "
+            f"{domain} split assignments "
+            "do not contain the expected "
             "ordered row indices."
         )
 
-    observed_splits = set(assignments["split"].unique())
+    observed_splits = set(
+        assignments[
+            "split"
+        ].unique()
+    )
 
-    if observed_splits != set(VALID_SPLITS):
+    if (
+        observed_splits
+        != set(VALID_SPLITS)
+    ):
         raise ValueError(
-            f"{domain} split assignments contain unexpected split "
-            f"labels: {sorted(observed_splits)}"
+            f"{domain} split assignments "
+            "contain unexpected split "
+            f"labels: "
+            f"{sorted(observed_splits)}"
         )
 
-    # Validate against the counts recorded during preparation.
-    metadata = _load_metadata_cached()
+    metadata = (
+        _load_metadata_cached()
+    )
 
-    metadata_splits = metadata["datasets"][domain]["splits"]
+    metadata_splits = metadata[
+        "datasets"
+    ][domain]["splits"]
 
     for split in VALID_SPLITS:
         observed_count = int(
-            (assignments["split"] == split).sum()
+            (
+                assignments["split"]
+                == split
+            ).sum()
         )
 
         expected_count = int(
-            metadata_splits[split]["rows"]
+            metadata_splits[
+                split
+            ]["rows"]
         )
 
-        if observed_count != expected_count:
+        if (
+            observed_count
+            != expected_count
+        ):
             raise ValueError(
-                f"{domain}/{split} split-size mismatch. "
-                f"Expected {expected_count:,}, "
-                f"observed {observed_count:,}."
+                f"{domain}/{split} "
+                "split-size mismatch. "
+                f"Expected "
+                f"{expected_count:,}, "
+                f"observed "
+                f"{observed_count:,}."
+            )
+
+    return assignments
+
+
+@lru_cache(maxsize=1)
+def _load_nhanes_assignments_cached() -> pd.DataFrame:
+    path = (
+        SPLIT_ASSIGNMENT_PATHS[
+            "nhanes"
+        ]
+    )
+
+    _require_file(
+        path,
+        preparation_hint=(
+            "python3 src/prepare_nhanes.py"
+        ),
+    )
+
+    assignments = pd.read_csv(
+        path
+    )
+
+    required_columns = {
+        "row_index",
+        "seqn",
+        "split",
+    }
+
+    missing = (
+        required_columns
+        - set(
+            assignments.columns
+        )
+    )
+
+    if missing:
+        raise ValueError(
+            "nhanes split assignments "
+            "are missing columns: "
+            + ", ".join(
+                sorted(missing)
+            )
+        )
+
+    primary = (
+        _load_nhanes_feature_set_cached(
+            "strict_common_16"
+        )
+    )
+
+    if (
+        len(assignments)
+        != len(primary)
+    ):
+        raise ValueError(
+            "nhanes split-assignment "
+            "row count does not match "
+            "STRICT_COMMON_16."
+        )
+
+    expected_row_indices = np.arange(
+        len(primary)
+    )
+
+    observed_row_indices = (
+        assignments[
+            "row_index"
+        ].to_numpy()
+    )
+
+    if not np.array_equal(
+        observed_row_indices,
+        expected_row_indices,
+    ):
+        raise ValueError(
+            "nhanes split assignments "
+            "do not contain expected "
+            "ordered row indices."
+        )
+
+    expected_seqn = (
+        primary["seqn"]
+        .to_numpy()
+    )
+
+    observed_seqn = (
+        assignments["seqn"]
+        .to_numpy()
+    )
+
+    if not np.array_equal(
+        observed_seqn,
+        expected_seqn,
+    ):
+        raise ValueError(
+            "nhanes split assignments "
+            "do not align with "
+            "STRICT_COMMON_16 SEQN order."
+        )
+
+    observed_splits = set(
+        assignments[
+            "split"
+        ].unique()
+    )
+
+    if (
+        observed_splits
+        != set(VALID_SPLITS)
+    ):
+        raise ValueError(
+            "nhanes split assignments "
+            "contain unexpected labels: "
+            f"{sorted(observed_splits)}"
+        )
+
+    metadata = (
+        _load_nhanes_metadata_cached()
+    )
+
+    metadata_splits = metadata[
+        "primary_splits"
+    ]
+
+    for split in VALID_SPLITS:
+        observed_count = int(
+            (
+                assignments["split"]
+                == split
+            ).sum()
+        )
+
+        expected_count = int(
+            metadata_splits[
+                split
+            ]["rows"]
+        )
+
+        if (
+            observed_count
+            != expected_count
+        ):
+            raise ValueError(
+                f"nhanes/{split} "
+                "split-size mismatch. "
+                f"Expected "
+                f"{expected_count:,}, "
+                f"observed "
+                f"{observed_count:,}."
             )
 
     return assignments
@@ -293,11 +1137,30 @@ def load_split_assignments(
     domain: Domain,
 ) -> pd.DataFrame:
     """
-    Return the authoritative row-to-split assignment table.
-    """
-    domain = _validate_domain(domain)
+    Return the authoritative row/participant-to-split assignment table.
 
-    return _load_assignments_cached(domain).copy()
+    Source/Kaggle assignments are row-index based.
+    NHANES assignments are participant (SEQN) based.
+    """
+
+    domain = (
+        _validate_domain(
+            domain
+        )
+    )
+
+    if domain == "nhanes":
+        return (
+            _load_nhanes_assignments_cached()
+            .copy()
+        )
+
+    return (
+        _load_source_kaggle_assignments_cached(
+            domain
+        )
+        .copy()
+    )
 
 
 # =============================================================================
@@ -311,85 +1174,242 @@ def load_split(
     *,
     include_row_index: bool = False,
     include_id: bool = False,
+    include_seqn: bool = False,
+    feature_set: FeatureSet | None = None,
 ) -> pd.DataFrame:
     """
     Load one fixed dataset split.
 
-    The split is reconstructed from the canonical dataset and the authoritative
-    split-assignment file.
-
     Parameters
     ----------
     domain:
-        "source" or "kaggle".
+        "source", "kaggle", or "nhanes".
 
     split:
         "train", "val", or "test".
 
     include_row_index:
-        Add the original canonical-dataset row index as a column.
+        Include the authoritative preparation row index.
 
     include_id:
-        Add the original Kaggle id column. Only valid for domain="kaggle".
+        Include the original Kaggle id column. Only valid for Kaggle.
 
-        id is intentionally excluded by default so it cannot accidentally enter
-        normal model training. It should only be enabled for explicit artifact
-        experiments.
+    include_seqn:
+        Include NHANES participant identifier SEQN. Only valid for NHANES.
 
-    Returns
-    -------
-    pandas.DataFrame
-        The requested split, with rows in canonical dataset order.
+    feature_set:
+        One of:
+            full_24
+            strict_common_16
+            common_20
+            common_22
+
+        Defaults to full_24 for Source/Kaggle and strict_common_16 for NHANES.
+
+    Notes
+    -----
+    NHANES sensitivity sets reuse the STRICT_COMMON_16 SEQN split assignment.
+    This guarantees that a participant cannot move between train/validation/test
+    merely because a different feature set is selected.
     """
 
-    domain = _validate_domain(domain)
-    split = _validate_split(split)
-
-    if include_id and domain != "kaggle":
-        raise ValueError(
-            "include_id=True is only valid for the Kaggle domain."
+    domain = (
+        _validate_domain(
+            domain
         )
-
-    common = _load_common_cached(domain)
-    assignments = _load_assignments_cached(domain)
-
-    mask = assignments["split"].eq(split)
-
-    row_indices = (
-        assignments.loc[mask, "row_index"]
-        .to_numpy(dtype=np.int64)
     )
 
+    split = (
+        _validate_split(
+            split
+        )
+    )
+
+    resolved = (
+        _resolve_feature_set(
+            domain,
+            feature_set,
+        )
+    )
+
+    if (
+        include_id
+        and domain != "kaggle"
+    ):
+        raise ValueError(
+            "include_id=True is only "
+            "valid for the Kaggle domain."
+        )
+
+    if (
+        include_seqn
+        and domain != "nhanes"
+    ):
+        raise ValueError(
+            "include_seqn=True is only "
+            "valid for the NHANES domain."
+        )
+
+    schema = (
+        load_feature_schema(
+            resolved
+        )
+    )
+
+    # -------------------------------------------------------------------------
+    # Source / Kaggle: preserve historical row-index reconstruction.
+    # -------------------------------------------------------------------------
+
+    if domain in {
+        "source",
+        "kaggle",
+    }:
+        common = (
+            _load_source_kaggle_full_cached(
+                domain
+            )
+        )
+
+        assignments = (
+            _load_source_kaggle_assignments_cached(
+                domain
+            )
+        )
+
+        mask = (
+            assignments[
+                "split"
+            ].eq(split)
+        )
+
+        row_indices = (
+            assignments.loc[
+                mask,
+                "row_index",
+            ]
+            .to_numpy(
+                dtype=np.int64
+            )
+        )
+
+        df = (
+            common.iloc[
+                row_indices
+            ][
+                list(
+                    schema.model_columns
+                )
+            ]
+            .reset_index(
+                drop=True
+            )
+            .copy()
+        )
+
+        if include_row_index:
+            df.insert(
+                0,
+                "row_index",
+                row_indices,
+            )
+
+        if include_id:
+            ids = (
+                assignments.loc[
+                    mask,
+                    "id",
+                ]
+                .to_numpy()
+            )
+
+            insert_location = (
+                1
+                if include_row_index
+                else 0
+            )
+
+            df.insert(
+                insert_location,
+                "id",
+                ids,
+            )
+
+        return df
+
+    # -------------------------------------------------------------------------
+    # NHANES: split by authoritative SEQN membership.
+    # -------------------------------------------------------------------------
+
+    nhanes = (
+        _load_nhanes_feature_set_cached(
+            resolved
+        )
+    )
+
+    assignments = (
+        _load_nhanes_assignments_cached()
+    )
+
+    assignment_map = (
+        assignments[
+            [
+                "row_index",
+                "seqn",
+                "split",
+            ]
+        ]
+    )
+
+    joined = nhanes.merge(
+        assignment_map,
+        on="seqn",
+        how="left",
+        validate="one_to_one",
+    )
+
+    if joined["split"].isna().any():
+        missing_count = int(
+            joined["split"]
+            .isna()
+            .sum()
+        )
+
+        raise ValueError(
+            f"nhanes/{resolved}: "
+            f"{missing_count:,} rows do not "
+            "have authoritative split assignments."
+        )
+
     df = (
-        common.iloc[row_indices]
-        .reset_index(drop=True)
+        joined.loc[
+            joined["split"].eq(
+                split
+            )
+        ]
+        .reset_index(
+            drop=True
+        )
         .copy()
     )
 
-    if include_row_index:
-        df.insert(
-            0,
-            "row_index",
-            row_indices,
-        )
+    output_columns = [
+        *(
+            ["row_index"]
+            if include_row_index
+            else []
+        ),
+        *(
+            ["seqn"]
+            if include_seqn
+            else []
+        ),
+        *schema.features,
+        schema.target,
+    ]
 
-    if include_id:
-        ids = (
-            assignments.loc[mask, "id"]
-            .to_numpy()
-        )
-
-        insert_location = (
-            1 if include_row_index else 0
-        )
-
-        df.insert(
-            insert_location,
-            "id",
-            ids,
-        )
-
-    return df
+    return df[
+        output_columns
+    ].copy()
 
 
 # =============================================================================
@@ -402,7 +1422,11 @@ def load_xy(
     split: Split,
     *,
     include_id: bool = False,
-) -> tuple[pd.DataFrame, pd.Series]:
+    feature_set: FeatureSet | None = None,
+) -> tuple[
+    pd.DataFrame,
+    pd.Series,
+]:
     """
     Load a fixed split and return predictors (X) and binary target (y).
 
@@ -410,21 +1434,49 @@ def load_xy(
     preprocessing is performed here.
     """
 
+    domain = (
+        _validate_domain(
+            domain
+        )
+    )
+
+    resolved = (
+        _resolve_feature_set(
+            domain,
+            feature_set,
+        )
+    )
+
     df = load_split(
         domain,
         split,
         include_id=include_id,
+        feature_set=resolved,
     )
 
-    schema = load_schema()
+    schema = (
+        load_feature_schema(
+            resolved
+        )
+    )
 
-    feature_columns = list(schema.features)
+    feature_columns = list(
+        schema.features
+    )
 
     if include_id:
-        feature_columns = ["id"] + feature_columns
+        feature_columns = [
+            "id",
+            *feature_columns,
+        ]
 
-    X = df[feature_columns].copy()
-    y = df[schema.target].copy()
+    X = df[
+        feature_columns
+    ].copy()
+
+    y = df[
+        schema.target
+    ].copy()
 
     return X, y
 
@@ -437,38 +1489,84 @@ def load_xy(
 def split_summary(
     domain: Domain,
     split: Split,
+    *,
+    feature_set: FeatureSet | None = None,
 ) -> dict:
     """
     Return a small summary of a prepared split.
     """
 
-    df = load_split(domain, split)
+    domain = (
+        _validate_domain(
+            domain
+        )
+    )
 
-    schema = load_schema()
+    resolved = (
+        _resolve_feature_set(
+            domain,
+            feature_set,
+        )
+    )
+
+    df = load_split(
+        domain,
+        split,
+        feature_set=resolved,
+    )
+
+    schema = (
+        load_feature_schema(
+            resolved
+        )
+    )
 
     counts = (
-        df[schema.target]
+        df[
+            schema.target
+        ]
         .value_counts()
         .sort_index()
     )
 
     proportions = (
-        df[schema.target]
-        .value_counts(normalize=True)
+        df[
+            schema.target
+        ]
+        .value_counts(
+            normalize=True
+        )
         .sort_index()
     )
 
     return {
-        "domain": domain,
-        "split": split,
-        "rows": len(df),
-        "features": len(schema.features),
+        "domain":
+            domain,
+
+        "split":
+            split,
+
+        "feature_set":
+            resolved,
+
+        "rows":
+            len(df),
+
+        "features":
+            len(
+                schema.features
+            ),
+
         "class_counts": {
-            int(label): int(count)
-            for label, count in counts.items()
+            int(label):
+                int(count)
+            for label, count
+            in counts.items()
         },
+
         "class_proportions": {
-            int(label): float(proportion)
+            int(label):
+                float(proportion)
             for label, proportion
             in proportions.items()
         },
@@ -484,61 +1582,163 @@ def main() -> None:
     schema = load_schema()
 
     print("=" * 80)
-    print("DATA SCHEMA")
+    print("BASE DATA SCHEMA")
     print("=" * 80)
 
-    print(f"Target: {schema.target}")
-    print(f"Features: {len(schema.features)}")
     print(
-        f"Categorical: {len(schema.categorical_features)}"
-    )
-    print(
-        f"Numeric: {len(schema.numeric_features)}"
+        f"Target: "
+        f"{schema.target}"
     )
 
-    print("\n" + "=" * 80)
-    print("FIXED SPLITS")
-    print("=" * 80)
+    print(
+        f"Full shared features: "
+        f"{len(schema.features)}"
+    )
 
-    for domain in VALID_DOMAINS:
-        print(f"\n{domain.upper()}")
+    print(
+        f"Categorical: "
+        f"{len(schema.categorical_features)}"
+    )
+
+    print(
+        f"Numeric: "
+        f"{len(schema.numeric_features)}"
+    )
+
+    print(
+        "\nFeature sets:"
+    )
+
+    for feature_set in (
+        "full_24",
+        "strict_common_16",
+        "common_20",
+        "common_22",
+    ):
+        feature_schema = (
+            load_feature_schema(
+                feature_set
+            )
+        )
+
+        print(
+            f"  {feature_set:<18} "
+            f"features="
+            f"{len(feature_schema.features):>2}"
+        )
+
+    print(
+        "\n"
+        + "=" * 80
+    )
+
+    print(
+        "FIXED SPLITS"
+    )
+
+    print(
+        "=" * 80
+    )
+
+    smoke_configs = (
+        (
+            "source",
+            "full_24",
+        ),
+        (
+            "kaggle",
+            "full_24",
+        ),
+        (
+            "nhanes",
+            "strict_common_16",
+        ),
+    )
+
+    for (
+        domain,
+        feature_set,
+    ) in smoke_configs:
+        print(
+            f"\n{domain.upper()} "
+            f"[{feature_set}]"
+        )
 
         for split in VALID_SPLITS:
-            summary = split_summary(
-                domain,  # type: ignore[arg-type]
-                split,   # type: ignore[arg-type]
+            summary = (
+                split_summary(
+                    domain,  # type: ignore[arg-type]
+                    split,   # type: ignore[arg-type]
+                    feature_set=feature_set,  # type: ignore[arg-type]
+                )
             )
 
             positive = (
-                summary["class_proportions"]
-                .get(1, 0.0)
+                summary[
+                    "class_proportions"
+                ]
+                .get(
+                    1,
+                    0.0,
+                )
             )
 
             print(
                 f"  {split:<5} "
-                f"rows={summary['rows']:>8,}  "
-                f"positive={positive:.6f}"
+                f"rows="
+                f"{summary['rows']:>8,}  "
+                f"positive="
+                f"{positive:.6f}"
             )
 
-    print("\n" + "=" * 80)
-    print("X / Y TEST")
-    print("=" * 80)
-
-    X, y = load_xy("source", "train")
-
-    print(f"X shape: {X.shape}")
-    print(f"y shape: {y.shape}")
-    print(f"Target dtype: {y.dtype}")
-
-    X_kaggle, y_kaggle = load_xy(
-        "kaggle",
-        "train",
+    print(
+        "\n"
+        + "=" * 80
     )
 
-    print(f"\nKaggle X shape: {X_kaggle.shape}")
-    print(f"Kaggle y shape: {y_kaggle.shape}")
+    print(
+        "THREE-DOMAIN FEATURE-ORDER TEST"
+    )
 
-    # Explicit id test.
+    print(
+        "=" * 80
+    )
+
+    strict_columns = None
+
+    for domain in VALID_DOMAINS:
+        X, y = load_xy(
+            domain,  # type: ignore[arg-type]
+            "train",
+            feature_set=
+                "strict_common_16",
+        )
+
+        print(
+            f"{domain:<8} "
+            f"X={X.shape} "
+            f"y={y.shape} "
+            f"target_dtype={y.dtype}"
+        )
+
+        columns = tuple(
+            X.columns
+        )
+
+        if strict_columns is None:
+            strict_columns = columns
+        elif columns != strict_columns:
+            raise RuntimeError(
+                "STRICT_COMMON_16 feature "
+                "order differs across domains."
+            )
+
+    print(
+        "\nSTRICT_COMMON_16 "
+        "feature order: OK"
+    )
+
+    # Explicit Kaggle id test.
     X_with_id, _ = load_xy(
         "kaggle",
         "test",
@@ -553,6 +1753,27 @@ def main() -> None:
     print(
         f"First columns: "
         f"{list(X_with_id.columns[:4])}"
+    )
+
+    # Explicit NHANES SEQN test.
+    nhanes_with_seqn = (
+        load_split(
+            "nhanes",
+            "test",
+            include_seqn=True,
+            feature_set=
+                "strict_common_16",
+        )
+    )
+
+    print(
+        "\nNHANES test with explicit SEQN: "
+        f"{nhanes_with_seqn.shape}"
+    )
+
+    print(
+        f"First columns: "
+        f"{list(nhanes_with_seqn.columns[:4])}"
     )
 
 

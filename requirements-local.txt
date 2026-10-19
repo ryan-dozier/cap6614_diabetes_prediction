@@ -9,6 +9,7 @@ attrs==26.1.0
 babel==2.18.0
 beautifulsoup4==4.15.0
 bleach==6.4.0
+catboost==1.2.10
 certifi==2026.7.22
 cffi==2.1.1
 charset-normalizer==3.5.2
@@ -29,6 +30,7 @@ filelock==3.32.3
 fonttools==4.67.0
 fqdn==1.6.0
 fsspec==2026.7.0
+graphviz==0.21
 h11==0.16.0
 hf-xet==1.7.0
 httpcore==1.0.9
@@ -97,6 +99,7 @@ parso==0.8.7
 pexpect==4.9.0
 pillow==12.3.0
 platformdirs==4.13.0
+plotly==7.1.0
 prometheus_client==0.26.0
 prompt_toolkit==3.0.53
 psutil==7.2.2

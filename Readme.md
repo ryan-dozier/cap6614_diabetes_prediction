@@ -423,25 +423,24 @@ The primary question addressed by this experiment is whether a smaller set of ar
 
 ## Running the Current Analysis Pipeline
 
-Assuming the raw datasets are already present in the expected locations, the current pipeline can be run with:
+With the Conda environment activated and the manually acquired Source/Kaggle raw datasets in their expected locations, run the following from the project root. The NHANES downloader skips existing files.
+
+Both Source/Kaggle and NHANES preparation must finish before running `src.data`: its smoke test validates all three domains and requires NHANES feature metadata and split assignments.
 
 ```bash
 python3 -m scripts.diagnostics.inspect_datasets
+./scripts/download_nhanes_2015_2016.sh
+python3 -m scripts.diagnostics.inspect_nhanes
+python3 -m scripts.prepare_nhanes
 python3 -m scripts.prepare_data
 python3 -m src.data
 python3 -m src.analysis.domain_classifier
 python3 -m src.analysis.analyze_distribution_shift
 python3 -m src.analysis.domain_feature_ablation
-```
-
-For the NHANES workflow and three-domain comparison:
-
-```bash
-./scripts/download_nhanes_2015_2016.sh
-python3 -m scripts.diagnostics.inspect_nhanes
-python3 -m scripts.prepare_nhanes
 python3 -m src.analysis.compare_harmonized_domains
 ```
+
+Alternatively, `./scripts/initial_setup.sh` performs downloading, NHANES inspection, preparation for all three domains, and the loader smoke test. After it completes, run the four `src.analysis` commands above.
 
 `inspect_datasets.py` and `data.py` are primarily diagnostic checks.
 

@@ -5,16 +5,16 @@ from pathlib import Path
 
 import pandas as pd
 
+from src.paths import (
+    NHANES_INSPECTION_DIR as OUTPUT_DIR,
+    NHANES_RAW_DIR as NHANES_DIR,
+    PROJECT_ROOT as ROOT,
+)
+
 
 # =============================================================================
 # Paths
 # =============================================================================
-
-ROOT = Path(__file__).resolve().parents[1]
-
-NHANES_DIR = ROOT / "data/raw/nhanes_2015_2016"
-
-OUTPUT_DIR = ROOT / "results/nhanes_inspection"
 
 VALUE_CODE_AUDIT_PATH = (
     OUTPUT_DIR / "value_code_audit.csv"

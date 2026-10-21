@@ -8,18 +8,17 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
+from src.paths import (
+    KAGGLE_RAW_PATH as KAGGLE_PATH,
+    PROCESSED_DIR,
+    PROJECT_ROOT as ROOT,
+    SOURCE_RAW_PATH as SOURCE_PATH,
+    SPLITS_DIR,
+)
 
 # =============================================================================
 # Project paths
 # =============================================================================
-
-ROOT = Path(__file__).resolve().parents[1]
-
-SOURCE_PATH = ROOT / "data/raw/source/diabetes_dataset.csv"
-KAGGLE_PATH = ROOT / "data/raw/kaggle_s5e12/train.csv"
-
-PROCESSED_DIR = ROOT / "data/processed"
-SPLITS_DIR = ROOT / "data/splits"
 
 SOURCE_COMMON_PATH = PROCESSED_DIR / "source_common.csv"
 KAGGLE_COMMON_PATH = PROCESSED_DIR / "kaggle_common.csv"

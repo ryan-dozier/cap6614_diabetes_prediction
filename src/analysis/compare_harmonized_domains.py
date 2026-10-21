@@ -5,18 +5,20 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from src.paths import (
+    HARMONIZED_DOMAIN_COMPARISON_DIR as OUTPUT_DIR,
+    PROCESSED_DIR,
+    PROJECT_ROOT as ROOT,
+)
+
 
 # =============================================================================
 # Paths
 # =============================================================================
 
-ROOT = Path(__file__).resolve().parents[1]
-
-SOURCE_PATH = ROOT / "data/processed/source_common.csv"
-KAGGLE_PATH = ROOT / "data/processed/kaggle_common.csv"
-NHANES_PATH = ROOT / "data/processed/nhanes_harmonized.csv"
-
-OUTPUT_DIR = ROOT / "results/harmonized_domain_comparison"
+SOURCE_PATH = PROCESSED_DIR / "source_common.csv"
+KAGGLE_PATH = PROCESSED_DIR / "kaggle_common.csv"
+NHANES_PATH = PROCESSED_DIR / "nhanes_harmonized.csv"
 
 NUMERIC_SUMMARY_PATH = OUTPUT_DIR / "numeric_summary.csv"
 CATEGORICAL_FREQUENCIES_PATH = OUTPUT_DIR / "categorical_frequencies.csv"

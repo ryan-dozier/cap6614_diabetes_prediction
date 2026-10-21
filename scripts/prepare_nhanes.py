@@ -7,19 +7,18 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
+from src.paths import (
+    NHANES_PREPARATION_DIR as OUTPUT_DIR,
+    NHANES_RAW_DIR as NHANES_DIR,
+    PROCESSED_DIR,
+    PROJECT_ROOT as ROOT,
+    SOURCE_RAW_PATH,
+    SPLITS_DIR,
+)
 
 # =============================================================================
 # Paths
 # =============================================================================
-
-ROOT = Path(__file__).resolve().parents[1]
-
-NHANES_DIR = ROOT / "data/raw/nhanes_2015_2016"
-SOURCE_RAW_PATH = ROOT / "data/raw/source/diabetes_dataset.csv"
-
-PROCESSED_DIR = ROOT / "data/processed"
-SPLITS_DIR = ROOT / "data/splits"
-OUTPUT_DIR = ROOT / "results/nhanes_preparation"
 
 HARMONIZED_PATH = (
     PROCESSED_DIR / "nhanes_harmonized.csv"

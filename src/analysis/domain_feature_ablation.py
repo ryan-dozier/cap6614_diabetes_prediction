@@ -27,17 +27,18 @@ except ImportError as exc:
         "  python3 -m pip install catboost"
     ) from exc
 
-from data import load_common, load_schema
+from src.data import load_common, load_schema
+from src.paths import (
+    DOMAIN_CLASSIFIER_DIR,
+    DOMAIN_FEATURE_ABLATION_DIR as OUTPUT_DIR,
+    PROJECT_ROOT as ROOT,
+)
 
 
 # =============================================================================
 # Paths
 # =============================================================================
 
-ROOT = Path(__file__).resolve().parents[1]
-
-DOMAIN_CLASSIFIER_DIR = ROOT / "results/domain_classifier"
-OUTPUT_DIR = ROOT / "results/domain_feature_ablation"
 FIGURES_DIR = OUTPUT_DIR / "figures"
 
 DOMAIN_METRICS_PATH = DOMAIN_CLASSIFIER_DIR / "metrics.json"
@@ -1088,7 +1089,7 @@ def save_metadata(
         },
         "sampling_policy": (
             "Exact original balanced samples are reconstructed from "
-            "results/domain_classifier/sampling_provenance.csv.gz."
+            f"{SAMPLING_PROVENANCE_PATH.relative_to(ROOT)}."
         ),
         "model": {
             "class": "CatBoostClassifier",

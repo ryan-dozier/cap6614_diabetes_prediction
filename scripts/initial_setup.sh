@@ -7,9 +7,6 @@ cd "$ROOT_DIR"
 
 EXPECTED_ENV="synthetic-tabular-ai"
 
-SOURCE_DATA="data/raw/source/diabetes_dataset.csv"
-KAGGLE_DATA="data/raw/kaggle_s5e12/train.csv"
-
 echo "========================================"
 echo "Diabetes Prediction Project Setup"
 echo "========================================"
@@ -61,6 +58,9 @@ fi
 echo
 echo "Checking required Source/Kaggle raw datasets..."
 
+SOURCE_DATA="$(python3 -c 'from src.paths import SOURCE_RAW_PATH; print(SOURCE_RAW_PATH)')"
+KAGGLE_DATA="$(python3 -c 'from src.paths import KAGGLE_RAW_PATH; print(KAGGLE_RAW_PATH)')"
+
 if [ ! -f "$SOURCE_DATA" ]; then
     echo "ERROR: Missing source dataset:"
     echo "  $SOURCE_DATA"
@@ -85,11 +85,11 @@ echo "Downloading NHANES 2015-2016 components..."
 
 echo
 echo "Inspecting NHANES components..."
-python3 src/inspect_nhanes.py
+python3 -m scripts.diagnostics.inspect_nhanes
 
 echo
 echo "Preparing harmonized NHANES datasets and fixed splits..."
-python3 src/prepare_nhanes.py
+python3 -m scripts.prepare_nhanes
 
 # -----------------------------------------------------------------------------
 # Prepare Source / Kaggle canonical data
@@ -97,7 +97,7 @@ python3 src/prepare_nhanes.py
 
 echo
 echo "Preparing Source/Kaggle canonical datasets and fixed splits..."
-python3 src/prepare_data.py
+python3 -m scripts.prepare_data
 
 # -----------------------------------------------------------------------------
 # Validate unified data-loading interface
@@ -105,7 +105,7 @@ python3 src/prepare_data.py
 
 echo
 echo "Running three-domain data-loader smoke test..."
-python3 src/data.py
+python3 -m src.data
 
 echo
 echo "========================================"

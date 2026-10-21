@@ -92,12 +92,13 @@ The setup script performs the following checks and initialization steps:
 3. Checks that the required raw datasets are present:
    - `data/raw/source/diabetes_dataset.csv`
    - `data/raw/kaggle_s5e12/train.csv`
-4. Runs `src/prepare_data.py` to:
+4. Downloads and inspects the NHANES 2015-2016 components, then runs `scripts/prepare_nhanes.py` to create the harmonized NHANES datasets and fixed splits.
+5. Runs `scripts/prepare_data.py` to:
    - validate the raw datasets;
    - create the canonical shared-feature datasets;
    - generate the fixed train/validation/test splits; and
    - write preparation metadata.
-5. Runs `src/data.py` as a smoke test to verify that the prepared datasets, schema, and fixed splits can be loaded correctly.
+6. Runs `src/data.py` as a smoke test to verify that the prepared datasets, schema, and fixed splits can be loaded correctly.
 
 A successful setup ends with:
 
@@ -128,7 +129,11 @@ conda activate synthetic-tabular-ai
 
 ## Scripts and Workflow
 
-The scripts in `src/` form the data preparation and distribution-shift analysis pipeline used by the project. Unless otherwise noted, commands should be run from the project root.
+Data preparation lives in `scripts/`, diagnostics in `scripts/diagnostics/`, and distribution-shift analyses in `src/analysis/`. The shared data loader lives in `src/data.py`.
+
+`src/paths.py` is the single source for the project root, data directories, raw dataset locations, and result directories. Update those definitions when changing the directory layout; individual modules derive their output filenames from these shared locations.
+
+Run Python entry points as modules (`python3 -m ...`) from the project root, as shown below. This keeps package imports working without modifying `sys.path` or setting `PYTHONPATH`. Paths to data and results are anchored to `src/paths.py`, not the current working directory. The shell setup and download scripts locate the project root themselves and read dataset locations from the same module; the download script therefore also requires Python.
 
 A typical workflow is:
 
@@ -146,7 +151,7 @@ analyze_distribution_shift.py
 domain_feature_ablation.py
 ```
 
-### `src/inspect_datasets.py`
+### `scripts/diagnostics/inspect_datasets.py`
 
 Performs an initial inspection of the raw source and Kaggle datasets.
 
@@ -164,14 +169,14 @@ The script:
 Run with:
 
 ```bash
-python3 src/inspect_datasets.py
+python3 -m scripts.diagnostics.inspect_datasets
 ```
 
 This script is primarily a diagnostic tool and does not modify the datasets.
 
 ---
 
-### `src/prepare_data.py`
+### `scripts/prepare_data.py`
 
 Creates the canonical datasets used by the experiments.
 
@@ -199,7 +204,7 @@ The fixed split proportions are:
 Run with:
 
 ```bash
-python3 src/prepare_data.py
+python3 -m scripts.prepare_data
 ```
 
 Generated data is written under:
@@ -246,14 +251,14 @@ Any preprocessing required by a particular model should be fitted using that exp
 The module can also be executed directly as a smoke test:
 
 ```bash
-python3 src/data.py
+python3 -m src.data
 ```
 
 This verifies the prepared schema, fixed splits, and feature/target loading.
 
 ---
 
-### `src/domain_classifier.py`
+### `src/analysis/domain_classifier.py`
 
 Measures how easily the source and Kaggle-generated distributions can be distinguished.
 
@@ -292,7 +297,7 @@ It also calculates feature importance to identify predictors that contain the st
 Run with:
 
 ```bash
-python3 src/domain_classifier.py
+python3 -m src.analysis.domain_classifier
 ```
 
 Outputs are written to:
@@ -310,7 +315,7 @@ results/domain_classifier/
 
 ---
 
-### `src/analyze_distribution_shift.py`
+### `src/analysis/analyze_distribution_shift.py`
 
 Performs a more detailed statistical analysis of the differences between the source and Kaggle distributions.
 
@@ -342,7 +347,7 @@ The statistical shift measures are combined with the feature importance produced
 Run with:
 
 ```bash
-python3 src/analyze_distribution_shift.py
+python3 -m src.analysis.analyze_distribution_shift
 ```
 
 Outputs are written to:
@@ -362,7 +367,7 @@ Statistical calculations use the complete prepared datasets. Plotting may use de
 
 ---
 
-### `src/domain_feature_ablation.py`
+### `src/analysis/domain_feature_ablation.py`
 
 Measures how domain separability changes when the most domain-discriminative features are progressively removed.
 
@@ -398,7 +403,7 @@ The script first reproduces the original 24-feature classifier and verifies that
 Run with:
 
 ```bash
-python3 src/domain_feature_ablation.py
+python3 -m src.analysis.domain_feature_ablation
 ```
 
 Outputs are written to:
@@ -421,12 +426,21 @@ The primary question addressed by this experiment is whether a smaller set of ar
 Assuming the raw datasets are already present in the expected locations, the current pipeline can be run with:
 
 ```bash
-python3 src/inspect_datasets.py
-python3 src/prepare_data.py
-python3 src/data.py
-python3 src/domain_classifier.py
-python3 src/analyze_distribution_shift.py
-python3 src/domain_feature_ablation.py
+python3 -m scripts.diagnostics.inspect_datasets
+python3 -m scripts.prepare_data
+python3 -m src.data
+python3 -m src.analysis.domain_classifier
+python3 -m src.analysis.analyze_distribution_shift
+python3 -m src.analysis.domain_feature_ablation
+```
+
+For the NHANES workflow and three-domain comparison:
+
+```bash
+./scripts/download_nhanes_2015_2016.sh
+python3 -m scripts.diagnostics.inspect_nhanes
+python3 -m scripts.prepare_nhanes
+python3 -m src.analysis.compare_harmonized_domains
 ```
 
 `inspect_datasets.py` and `data.py` are primarily diagnostic checks.

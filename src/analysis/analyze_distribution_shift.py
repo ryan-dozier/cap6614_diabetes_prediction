@@ -15,10 +15,15 @@ from scipy.stats import (
     wasserstein_distance,
 )
 
-from data import (
+from src.data import (
     load_common,
     load_metadata,
     load_schema,
+)
+from src.paths import (
+    DISTRIBUTION_SHIFT_DIR as OUTPUT_DIR,
+    DOMAIN_CLASSIFIER_DIR,
+    PROJECT_ROOT as ROOT,
 )
 
 
@@ -26,18 +31,8 @@ from data import (
 # Paths
 # =============================================================================
 
-ROOT = Path(__file__).resolve().parents[1]
-
-DOMAIN_CLASSIFIER_DIR = (
-    ROOT / "results/domain_classifier"
-)
-
 DOMAIN_IMPORTANCE_PATH = (
     DOMAIN_CLASSIFIER_DIR / "feature_importance.csv"
-)
-
-OUTPUT_DIR = (
-    ROOT / "results/distribution_shift"
 )
 
 FIGURES_DIR = OUTPUT_DIR / "figures"

@@ -10,6 +10,8 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 
+from src.paths import NHANES_PREPARATION_DIR, PROCESSED_DIR, SPLITS_DIR
+
 
 # =============================================================================
 # Types
@@ -60,20 +62,12 @@ NHANES_FEATURE_SETS = {
 # Paths
 # =============================================================================
 
-ROOT = Path(__file__).resolve().parents[1]
-
-PROCESSED_DIR = ROOT / "data/processed"
-SPLITS_DIR = ROOT / "data/splits"
-
 METADATA_PATH = (
     PROCESSED_DIR / "metadata.json"
 )
 
 NHANES_METADATA_PATH = (
-    ROOT
-    / "results"
-    / "nhanes_preparation"
-    / "metadata.json"
+    NHANES_PREPARATION_DIR / "metadata.json"
 )
 
 COMMON_PATHS = {
@@ -220,7 +214,7 @@ def _load_metadata_cached() -> dict:
     _require_file(
         METADATA_PATH,
         preparation_hint=(
-            "python3 src/prepare_data.py"
+            "python3 -m scripts.prepare_data"
         ),
     )
 
@@ -268,7 +262,7 @@ def _load_nhanes_metadata_cached() -> dict:
     _require_file(
         NHANES_METADATA_PATH,
         preparation_hint=(
-            "python3 src/prepare_nhanes.py"
+            "python3 -m scripts.prepare_nhanes"
         ),
     )
 
@@ -546,7 +540,7 @@ def _load_source_kaggle_full_cached(
     _require_file(
         path,
         preparation_hint=(
-            "python3 src/prepare_data.py"
+            "python3 -m scripts.prepare_data"
         ),
     )
 
@@ -621,7 +615,7 @@ def _load_nhanes_feature_set_cached(
     _require_file(
         path,
         preparation_hint=(
-            "python3 src/prepare_nhanes.py"
+            "python3 -m scripts.prepare_nhanes"
         ),
     )
 
@@ -859,7 +853,7 @@ def _load_source_kaggle_assignments_cached(
     _require_file(
         path,
         preparation_hint=(
-            "python3 src/prepare_data.py"
+            "python3 -m scripts.prepare_data"
         ),
     )
 
@@ -993,7 +987,7 @@ def _load_nhanes_assignments_cached() -> pd.DataFrame:
     _require_file(
         path,
         preparation_hint=(
-            "python3 src/prepare_nhanes.py"
+            "python3 -m scripts.prepare_nhanes"
         ),
     )
 

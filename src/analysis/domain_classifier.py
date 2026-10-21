@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Literal
 
 import numpy as np
@@ -26,16 +25,13 @@ except ImportError as exc:
         "  pip install catboost"
     ) from exc
 
-from data import load_schema, load_split
+from src.data import load_schema, load_split
+from src.paths import DOMAIN_CLASSIFIER_DIR as OUTPUT_DIR, PROJECT_ROOT as ROOT
 
 
 # =============================================================================
 # Configuration
 # =============================================================================
-
-ROOT = Path(__file__).resolve().parents[1]
-
-OUTPUT_DIR = ROOT / "results/domain_classifier"
 
 METRICS_PATH = OUTPUT_DIR / "metrics.json"
 FEATURE_IMPORTANCE_PATH = OUTPUT_DIR / "feature_importance.csv"

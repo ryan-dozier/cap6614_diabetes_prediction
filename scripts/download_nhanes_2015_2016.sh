@@ -3,7 +3,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-OUTPUT_DIR="$ROOT_DIR/data/raw/nhanes_2015_2016"
+cd "$ROOT_DIR"
+OUTPUT_DIR="$(python3 -c 'from src.paths import NHANES_RAW_DIR; print(NHANES_RAW_DIR)')"
 
 BASE_URL="https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2015/DataFiles"
 

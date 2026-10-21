@@ -1,12 +1,9 @@
-from pathlib import Path
-
 import pandas as pd
 
-
-ROOT = Path(__file__).resolve().parents[1]
-
-SOURCE_PATH = ROOT / "data/raw/source/diabetes_dataset.csv"
-KAGGLE_PATH = ROOT / "data/raw/kaggle_s5e12/train.csv"
+from src.paths import (
+    KAGGLE_RAW_PATH as KAGGLE_PATH,
+    SOURCE_RAW_PATH as SOURCE_PATH,
+)
 
 TARGET = "diagnosed_diabetes"
 

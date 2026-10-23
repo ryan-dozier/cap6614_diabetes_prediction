@@ -151,6 +151,67 @@ analyze_distribution_shift.py
 domain_feature_ablation.py
 ```
 
+### Shared Predictive Experiments
+
+The predictive framework evaluates robustness under synthetic generator shift
+(Source and Kaggle are **both synthetic**) and synthetic-to-real shift to NHANES.
+CatBoost is the initial reference adapter; TabPFN, TabICL, and FT-Transformer are
+not implemented yet.
+
+The first configuration fits **one** CatBoost model with seed 42 on Source
+`train`, using Source `val` exclusively for early stopping and best-model
+selection. That same model predicts Source, Kaggle, and NHANES `test` using the
+ordered `strict_common_16` features. Test sets never select models, preprocessing,
+thresholds, or calibration. There is **no target-domain validation** or use of
+NHANES labels during fitting/model selection in this initial synthetic-to-real
+experiment.
+
+After preparing the canonical datasets, activate the project environment and
+run from the repository root:
+
+```bash
+python3 -m src.experiments.runner --config configs/catboost_source.json
+```
+
+The decision rule is `P(diagnosed_diabetes=1) >= 0.5`, with a fixed threshold
+shared across all test domains. `average_precision` is our precision-recall
+summary, not trapezoidal PR-curve area. Calibration uses ten fixed equal-width
+bins (including empty bins); no probability calibrator is fitted. One-class
+evaluation sets report ROC-AUC and average precision as JSON `null` with a warning.
+
+`src/paths.py` anchors output paths. Each run creates its configured directory
+inside `results/` exclusively and **refuses to reuse an existing directory**.
+Choose a new `output_dir` in the JSON configuration for every rerun. Outputs:
+
+- `config.json`: fully resolved configuration.
+- `metadata.json`: running/completed/failed status, UTC timestamps, schema,
+  split/class counts, model/preprocessing/compute details, timings, environment
+  versions, SHA-256 prepared-file fingerprints, and namespaced split identities.
+- `metrics.json`, `metrics.csv`, and `calibration_bins.csv`: per-domain evaluation.
+- `predictions_<domain>_test.csv.gz`: authoritative row indices (and NHANES
+  `seqn`) as provenance, labels, positive-class probabilities, and predictions.
+- `model.cbm`: the single fitted model in native CatBoost format.
+
+Identifiers never enter predictors. Native categorical handling converts
+categorical columns to strings on copies; there is no scaling, one-hot encoding,
+external target encoding, or imputation. Missing/nonfinite inputs are rejected.
+Model parameters use a small allowlist: `iterations`, `depth`, `learning_rate`,
+`loss_function` (Logloss), `eval_metric` (AUC or Logloss), `task_type`,
+`thread_count`, `verbose`, and `l2_leaf_reg`. Aliases and framework-controlled
+seed, early-stopping, best-model, and automatic-file-writing controls are rejected.
+The supplied CPU/four-thread configuration is a reproducibility-oriented starting
+point, not a claim that GPU is unavailable.
+
+Failures preserve available artifacts and record a failed status before
+re-raising the error. Fixed seeds and fingerprints aid reproducibility, but exact
+reproducibility across hardware or package versions is not guaranteed.
+
+Small dataset-independent checks (no full training or preparation):
+
+```bash
+python3 -m unittest discover -s tests -v
+```
+
 ### `scripts/diagnostics/inspect_datasets.py`
 
 Performs an initial inspection of the raw source and Kaggle datasets.

@@ -7,25 +7,26 @@ import platform
 import random
 import sys
 import time
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
 import numpy as np
-import pandas as pd
 
 from src import data
 from src.data import DatasetSchema, Domain, FeatureSet, Split
 from src.experiments.config import ExperimentConfig, load_config
-from src.experiments.metrics import binary_labels, evaluate_binary
+from src.experiments.metrics import evaluate_binary
 from src.experiments.results import (
     create_run_directory,
     write_evaluations,
     write_json,
     write_predictions,
+    write_training_sample,
 )
+from src.experiments.sampling import Partition, partition_summary, sampling_metadata, select_training
+from src.models.base import ModelAdapter
 from src.paths import PROJECT_ROOT
 
 LOGGER = logging.getLogger(__name__)
@@ -33,15 +34,6 @@ LOGGER = logging.getLogger(__name__)
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
-
-
-@dataclass
-class Partition:
-    X: pd.DataFrame
-    y: pd.Series
-    provenance: pd.DataFrame
-    identities: frozenset[tuple[str, int]]
-    summary: dict[str, Any]
 
 
 def load_partition(
@@ -61,15 +53,7 @@ def load_partition(
             raise ValueError(f"{domain}/{split}: {column} must contain unique integer identities.")
     identity_column = "seqn" if domain == "nhanes" else "row_index"
     identities = [int(value) for value in frame[identity_column]]
-    labels = binary_labels(frame[schema.target])
-    identity_lines = [f"{domain}\t{identity_column}\t{value}\n" for value in identities]
-    summary = {
-        "domain": domain, "split": split, "rows": len(frame),
-        "class_counts": {"0": int((labels == 0).sum()), "1": int((labels == 1).sum())},
-        "identity_column": identity_column,
-        "identity_sha256": hashlib.sha256("".join(sorted(identity_lines)).encode()).hexdigest(),
-        "ordered_identity_sha256": hashlib.sha256("".join(identity_lines).encode()).hexdigest(),
-    }
+    summary = partition_summary(domain, split, frame[identifiers], frame[schema.target])
     return Partition(
         X=frame.loc[:, list(schema.features)].copy(),
         y=frame[schema.target].copy(),
@@ -108,9 +92,10 @@ def prepared_fingerprints(config: ExperimentConfig) -> dict[str, str]:
     return fingerprints
 
 
-def environment_metadata() -> dict[str, Any]:
+def environment_metadata(model: str = "catboost") -> dict[str, Any]:
     packages = {}
-    for package in ("numpy", "pandas", "scikit-learn", "scipy", "catboost"):
+    model_packages = ("tabpfn", "torch") if model == "tabpfn" else ("catboost",)
+    for package in ("numpy", "pandas", "scikit-learn", "scipy", *model_packages):
         try:
             packages[package] = version(package)
         except PackageNotFoundError:
@@ -122,6 +107,38 @@ def environment_metadata() -> dict[str, Any]:
         "machine": platform.machine(),
         "packages": packages,
     }
+
+
+def selection_policy(model: str) -> str:
+    if model == "tabpfn":
+        return (
+            "One pretrained predictor prepared with training context only; validation unused. "
+            "No early stopping, validation-based selection, calibration or target-domain adaptation. "
+            "Fixed threshold; no test-based selection. Substantial computation occurs at prediction."
+        )
+    return (
+        "One fit on training-domain train; same-domain val exclusively for early stopping. "
+        "Fixed threshold; no target-domain validation, calibration, or test-based selection."
+    )
+
+
+def create_adapter(config: ExperimentConfig, schema: DatasetSchema) -> ModelAdapter:
+    if config.model == "tabpfn":
+        from src.models.tabpfn import TabPFNAdapter
+
+        return TabPFNAdapter(
+            schema.features, schema.categorical_features, schema.target,
+            seed=config.seed, model_params=config.model_params,
+        )
+    from src.models.catboost import CatBoostAdapter
+
+    if config.early_stopping_rounds is None:
+        raise ValueError("CatBoost requires early_stopping_rounds.")
+    return CatBoostAdapter(
+        schema.features, schema.categorical_features, schema.target,
+        seed=config.seed, model_params=config.model_params,
+        early_stopping_rounds=config.early_stopping_rounds,
+    )
 
 
 def run(config: ExperimentConfig) -> Path:
@@ -139,17 +156,15 @@ def run(config: ExperimentConfig) -> Path:
             "Fixed splits, seed, identity and prepared-file fingerprints are recorded. "
             "Exact reproducibility across different hardware or package versions is not guaranteed."
         ),
-        "selection_policy": (
-            "One fit on training-domain train; same-domain val exclusively for early stopping. "
-            "Fixed threshold; no target-domain validation, calibration, or test-based selection."
-        ),
+        "selection_policy": selection_policy(config.model),
+        "prediction_batch_size": config.prediction_batch_size,
     }
     try:
         write_json(output / "metadata.json", metadata)
         write_json(output / "config.json", config.to_dict())
         random.seed(config.seed)
         np.random.seed(config.seed)
-        metadata["environment"] = environment_metadata()
+        metadata["environment"] = environment_metadata(config.model)
         schema = data.load_feature_schema(config.feature_set)
         if (
             len(set(schema.features)) != len(schema.features)
@@ -171,19 +186,24 @@ def run(config: ExperimentConfig) -> Path:
             f"{config.train_domain}/train": train.summary,
             f"{config.validation_domain}/val": val.summary,
         })
+        selected = select_training(train, config.train_sample_size, config.sampling_seed)
+        metadata["training_partition_full"] = train.summary
+        metadata["training_context"] = selected.summary
+        metadata["sampling"] = sampling_metadata(
+            train, selected, config.train_sample_size, config.sampling_seed,
+        )
+        write_training_sample(output, config.train_domain, selected.provenance)
         write_json(output / "metadata.json", metadata)
 
-        from src.models.catboost import CatBoostAdapter
-
-        adapter = CatBoostAdapter(
-            schema.features, schema.categorical_features, schema.target,
-            seed=config.seed, model_params=config.model_params,
-            early_stopping_rounds=config.early_stopping_rounds,
-        )
+        adapter = create_adapter(config, schema)
+        metadata["model_artifact"] = adapter.artifact_name
+        adapter.reset_peak_memory()
+        adapter.synchronize()
         fit_started = time.perf_counter()
-        adapter.fit(train.X, train.y, val.X, val.y)
+        adapter.fit(selected.X, selected.y, val.X, val.y)
+        adapter.synchronize()
         metadata["fit_duration_seconds"] = time.perf_counter() - fit_started
-        adapter.save(output / "model.cbm")
+        adapter.save(output / adapter.artifact_name)
         metadata["model"] = adapter.metadata()
         metadata["preprocessing"] = metadata["model"]["preprocessing"]
         metadata["compute_settings"] = metadata["model"]["compute_settings"]
@@ -195,8 +215,13 @@ def run(config: ExperimentConfig) -> Path:
             require_disjoint(train, test)
             require_disjoint(val, test)
             metadata["splits"][f"{domain}/test"] = test.summary
+            adapter.synchronize()
             predict_started = time.perf_counter()
-            probability = adapter.predict_proba(test.X)
+            probability = (
+                adapter.predict_proba(test.X) if config.prediction_batch_size is None
+                else adapter.predict_proba_batched(test.X, config.prediction_batch_size)
+            )
+            adapter.synchronize()
             metadata["prediction_duration_seconds"][domain] = time.perf_counter() - predict_started
             evaluation = evaluate_binary(test.y, probability, config.threshold, config.calibration_bins)
             for warning in evaluation["warnings"]:
@@ -210,6 +235,7 @@ def run(config: ExperimentConfig) -> Path:
             write_predictions(output, domain, predictions)
             evaluations[domain] = evaluation
             write_evaluations(output, evaluations)
+            metadata["resources"] = adapter.resource_metadata()
             write_json(output / "metadata.json", metadata)
 
         print(f"{'domain':<10} {'ROC-AUC':>10} {'avg prec.':>10} {'F1':>10} {'Brier':>10}")
@@ -229,6 +255,17 @@ def run(config: ExperimentConfig) -> Path:
             total_duration_seconds=time.perf_counter() - started,
             error={"type": type(exc).__name__, "message": str(exc)},
         )
+        if config.model == "tabpfn" and "out of memory" in str(exc).lower():
+            context = {
+                "train_sample_size": config.train_sample_size,
+                "prediction_batch_size": config.prediction_batch_size,
+                "n_estimators": config.model_params.get("n_estimators", 4),
+                "device": config.model_params.get("device", "cuda:0"),
+                "recovery": "Use a NEW output directory and explicitly configure a smaller context/batch/ensemble; no automatic retry or fallback.",
+            }
+            metadata["error"]["out_of_memory_context"] = context
+            LOGGER.error("TabPFN out of memory: %s", context)
+            exc.add_note(f"TabPFN configured memory context: {context}")
         try:
             write_json(output / "metadata.json", metadata)
         except BaseException:

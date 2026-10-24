@@ -232,6 +232,8 @@ class RunnerTests(unittest.TestCase):
         self.stack.enter_context(patch.object(runner.data, "load_split", side_effect=self.load_split))
         self.factory = self.stack.enter_context(patch("src.models.catboost.CatBoostAdapter"))
         self.adapter = self.factory.return_value
+        self.adapter.artifact_name = "model.cbm"
+        self.adapter.resource_metadata.return_value = {}
         self.adapter.fit.side_effect = lambda *args: self.events.append("fit")
         self.adapter.predict_proba.return_value = np.array([0.5, 0.8])
         self.adapter.save.side_effect = lambda path: path.write_bytes(b"mock model")

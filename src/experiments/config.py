@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import math
-from dataclasses import asdict, dataclass, fields
+from dataclasses import MISSING, asdict, dataclass, fields
 from pathlib import Path
 from typing import Any
 
@@ -16,10 +16,13 @@ def positive_integer(value: object, name: str) -> int:
     return value
 
 
-def validate_model_params(params: object) -> None:
+def validate_model_params(params: object, model: str = "catboost") -> None:
     """Use a deliberately small allowlist; aliases and fit controls are forbidden."""
     if not isinstance(params, dict):
         raise ValueError("model_params must be a JSON object.")
+    if model == "tabpfn":
+        validate_tabpfn_params(params)
+        return
     supported = {
         "iterations", "depth", "learning_rate", "loss_function", "eval_metric",
         "task_type", "thread_count", "verbose", "l2_leaf_reg",
@@ -49,6 +52,36 @@ def validate_model_params(params: object) -> None:
             raise ValueError("task_type must be CPU or GPU.")
 
 
+def validate_tabpfn_params(params: dict[str, Any]) -> None:
+    supported = {
+        "n_estimators", "device", "fit_mode", "inference_precision",
+        "memory_saving_mode", "model_path",
+    }
+    unknown = set(params) - supported
+    if unknown:
+        raise ValueError(f"Unsupported or framework-controlled TabPFN model_params: {sorted(unknown)}")
+    if "n_estimators" in params:
+        positive_integer(params["n_estimators"], "n_estimators")
+    if "device" in params:
+        device = params["device"]
+        if not isinstance(device, str) or not (
+            device == "cpu" or (device.startswith("cuda:") and device[5:].isdigit())
+        ):
+            raise ValueError("TabPFN device must be explicit: cpu or cuda:<index>.")
+    if "fit_mode" in params and params["fit_mode"] not in ("fit_preprocessors", "low_memory", "fit_with_cache"):
+        raise ValueError("Unsupported TabPFN fit_mode; batched/fine-tuning mode is not supported.")
+    if "inference_precision" in params and params["inference_precision"] not in ("auto", "autocast", "float32"):
+        raise ValueError("TabPFN inference_precision must be auto, autocast, or float32.")
+    if "memory_saving_mode" in params:
+        value = params["memory_saving_mode"]
+        if type(value) is not bool and value != "auto":
+            raise ValueError("TabPFN memory_saving_mode must be a boolean or 'auto'.")
+    if "model_path" in params:
+        value = params["model_path"]
+        if not isinstance(value, str) or not value.strip() or value == "auto":
+            raise ValueError("model_path must name a local checkpoint, not 'auto'.")
+
+
 @dataclass(frozen=True)
 class ExperimentConfig:
     experiment_name: str
@@ -61,14 +94,17 @@ class ExperimentConfig:
     threshold: float
     calibration_bins: int
     model_params: dict[str, Any]
-    early_stopping_rounds: int
     output_dir: str
+    early_stopping_rounds: int | None = None
+    train_sample_size: int | None = None
+    sampling_seed: int | None = None
+    prediction_batch_size: int | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.experiment_name, str) or not self.experiment_name.strip():
             raise ValueError("experiment_name must be a nonempty string.")
-        if self.model != "catboost":
-            raise ValueError("model must be 'catboost'.")
+        if self.model not in ("catboost", "tabpfn"):
+            raise ValueError("model must be 'catboost' or 'tabpfn'.")
         for name, domain in (
             ("train_domain", self.train_domain),
             ("validation_domain", self.validation_domain),
@@ -92,8 +128,22 @@ class ExperimentConfig:
         if type(self.threshold) not in (int, float) or not math.isfinite(self.threshold) or not 0 < self.threshold < 1:
             raise ValueError("threshold must be a finite number strictly between 0 and 1.")
         positive_integer(self.calibration_bins, "calibration_bins")
-        positive_integer(self.early_stopping_rounds, "early_stopping_rounds")
-        validate_model_params(self.model_params)
+        if self.model == "catboost":
+            positive_integer(self.early_stopping_rounds, "early_stopping_rounds")
+        elif self.early_stopping_rounds is not None:
+            raise ValueError("TabPFN does not use early_stopping_rounds; omit it or use null.")
+        validate_model_params(self.model_params, self.model)
+        if self.train_sample_size is not None:
+            positive_integer(self.train_sample_size, "train_sample_size")
+            if self.sampling_seed is None:
+                raise ValueError("sampling_seed must be explicit when train_sample_size is set.")
+        if self.sampling_seed is not None:
+            if type(self.sampling_seed) is not int or not 0 <= self.sampling_seed < 2**32:
+                raise ValueError("sampling_seed must be an integer in [0, 2**32).")
+            if self.train_sample_size is None:
+                raise ValueError("sampling_seed requires train_sample_size.")
+        if self.prediction_batch_size is not None:
+            positive_integer(self.prediction_batch_size, "prediction_batch_size")
         if not isinstance(self.output_dir, str) or not self.output_dir.strip():
             raise ValueError("output_dir must be a nonempty path string.")
         self.resolved_output_dir
@@ -118,7 +168,8 @@ class ExperimentConfig:
             raise ValueError("Experiment configuration must be a JSON object.")
         expected = {field.name for field in fields(cls)}
         unknown = set(value) - expected
-        missing = expected - set(value)
+        required = {field.name for field in fields(cls) if field.default is MISSING}
+        missing = required - set(value)
         if unknown or missing:
             raise ValueError(f"Configuration fields: unknown={sorted(unknown)}, missing={sorted(missing)}")
         if not isinstance(value["test_domains"], list):

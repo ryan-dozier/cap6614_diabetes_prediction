@@ -1,0 +1,26 @@
+{
+  "experiment_name": "catboost_source_strict_common_16_n2000_seed42",
+  "model": "catboost",
+  "train_domain": "source",
+  "validation_domain": "source",
+  "test_domains": ["source", "kaggle", "nhanes"],
+  "feature_set": "strict_common_16",
+  "seed": 42,
+  "threshold": 0.5,
+  "calibration_bins": 10,
+  "train_sample_size": 2000,
+  "sampling_seed": 42,
+  "prediction_batch_size": 256,
+  "early_stopping_rounds": 100,
+  "model_params": {
+    "iterations": 1000,
+    "depth": 7,
+    "learning_rate": 0.05,
+    "loss_function": "Logloss",
+    "eval_metric": "AUC",
+    "task_type": "CPU",
+    "thread_count": 4,
+    "verbose": 100
+  },
+  "output_dir": "results/predictive/catboost_source_strict_common_16_n2000_seed42"
+}

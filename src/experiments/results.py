@@ -70,3 +70,14 @@ def write_predictions(output: Path, domain: str, predictions: pd.DataFrame) -> N
         index=False,
         compression={"method": "gzip", "mtime": 0},
     )
+
+
+def write_training_sample(output: Path, domain: str, provenance: pd.DataFrame) -> None:
+    sample = provenance.copy()
+    sample.insert(0, "sample_order", np.arange(len(sample)))
+    sample.insert(0, "split", "train")
+    sample.insert(0, "domain", domain)
+    sample.to_csv(
+        output / "training_sample.csv.gz", index=False,
+        compression={"method": "gzip", "mtime": 0},
+    )

@@ -8,7 +8,7 @@ import pandas as pd
 from numpy.typing import NDArray
 
 from src.experiments.config import positive_integer, validate_model_params
-from src.experiments.metrics import binary_labels, probabilities
+from src.experiments.metrics import binary_labels
 from src.models.base import ModelAdapter
 
 if TYPE_CHECKING:
@@ -16,6 +16,8 @@ if TYPE_CHECKING:
 
 
 class CatBoostAdapter(ModelAdapter):
+    artifact_name = "model.cbm"
+
     def __init__(
         self,
         features: tuple[str, ...],
@@ -42,25 +44,6 @@ class CatBoostAdapter(ModelAdapter):
             "early_stopping_rounds": early_stopping_rounds,
         }
         self._model: CatBoostClassifier | None = None
-
-    def _inputs(self, X: pd.DataFrame) -> pd.DataFrame:
-        if not isinstance(X, pd.DataFrame) or tuple(X.columns) != self.features:
-            raise ValueError(f"Predictors must have exact feature names and order: {self.features}")
-        if X.empty or X.isna().any().any():
-            raise ValueError("Predictors must be nonempty and contain no missing values.")
-        result = X.copy()
-        for feature in self.features:
-            column = result[feature]
-            if feature in self.categorical_features:
-                if column.map(lambda value: isinstance(value, (float, np.floating)) and not np.isfinite(value)).any():
-                    raise ValueError(f"{feature}: nonfinite categorical input.")
-                result[feature] = column.astype(str)
-            else:
-                if not pd.api.types.is_numeric_dtype(column) or pd.api.types.is_complex_dtype(column):
-                    raise ValueError(f"{feature}: expected finite numeric input.")
-                if not np.isfinite(column.to_numpy(dtype=float)).all():
-                    raise ValueError(f"{feature}: nonfinite numeric input.")
-        return result
 
     def fit(
         self, X_train: pd.DataFrame, y_train: pd.Series,
@@ -95,14 +78,7 @@ class CatBoostAdapter(ModelAdapter):
         normalized = self._inputs(X)
         raw = np.asarray(model.predict_proba(normalized))
         classes = np.asarray(model.classes_)
-        if raw.shape != (len(X), 2) or classes.shape != (2,) or set(classes) != {0, 1}:
-            raise ValueError("CatBoost returned an unexpected probability shape or class labels.")
-        if raw.dtype.kind not in "fiu" or not np.isfinite(raw).all() or ((raw < 0) | (raw > 1)).any():
-            raise ValueError("CatBoost returned invalid probabilities.")
-        if not np.allclose(raw.sum(axis=1), 1):
-            raise ValueError("CatBoost probability rows must sum to 1.")
-        positive_column = int(np.flatnonzero(classes == 1)[0])
-        return probabilities(raw[:, positive_column])
+        return self._positive_probability(raw, classes, len(X))
 
     def save(self, output_path: Path) -> None:
         if output_path.suffix != ".cbm":
@@ -113,6 +89,8 @@ class CatBoostAdapter(ModelAdapter):
         model = self._require_fitted()
         return {
             "adapter": type(self).__name__,
+            "validation_used": True,
+            "persistence": "Native CatBoost .cbm model.",
             "preprocessing": {
                 "categorical": "Native CatBoost handling; astype(str) on copies for fit and prediction.",
                 "numeric": "Unscaled, unencoded numeric values.",

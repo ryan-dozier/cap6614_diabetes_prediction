@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
+from src.domain_labels import DOMAIN_DISPLAY_NAMES, display_domain_name
 from src.paths import (
     KAGGLE_RAW_PATH as KAGGLE_PATH,
     PROCESSED_DIR,
@@ -181,14 +182,14 @@ def ensure_output_directories() -> None:
 def load_datasets() -> tuple[pd.DataFrame, pd.DataFrame]:
     print_header("LOADING RAW DATA")
 
-    print(f"Source: {SOURCE_PATH}")
+    print(f"{display_domain_name('source', include_id=True)} CSV: {SOURCE_PATH}")
     source = pd.read_csv(SOURCE_PATH)
 
-    print(f"Kaggle: {KAGGLE_PATH}")
+    print(f"{display_domain_name('kaggle', include_id=True)} CSV: {KAGGLE_PATH}")
     kaggle = pd.read_csv(KAGGLE_PATH)
 
-    print(f"\nSource shape: {source.shape}")
-    print(f"Kaggle shape: {kaggle.shape}")
+    print(f"\n{DOMAIN_DISPLAY_NAMES['source']} shape: {source.shape}")
+    print(f"{DOMAIN_DISPLAY_NAMES['kaggle']} shape: {kaggle.shape}")
 
     return source, kaggle
 
@@ -239,17 +240,17 @@ def validate_raw_schema(
     validate_exact_columns(
         source,
         expected_source_columns,
-        "Source dataset",
+        f"{display_domain_name('source', include_id=True)} dataset",
     )
 
     validate_exact_columns(
         kaggle,
         expected_kaggle_columns,
-        "Kaggle dataset",
+        f"{display_domain_name('kaggle', include_id=True)} dataset",
     )
 
-    print("Source schema: OK")
-    print("Kaggle schema: OK")
+    print(f"{DOMAIN_DISPLAY_NAMES['source']} schema: OK")
+    print(f"{DOMAIN_DISPLAY_NAMES['kaggle']} schema: OK")
 
 
 # =============================================================================
@@ -498,7 +499,7 @@ def print_duplicate_statistics(
     dataset_name: str,
     stats: dict[str, int],
 ) -> None:
-    print(f"\n{dataset_name}:")
+    print(f"\n{display_domain_name(dataset_name, include_id=True)}:")
 
     print(
         "  Exact duplicate rows beyond first: "
@@ -662,7 +663,7 @@ def print_split_summary(
     dataset_name: str,
     summary: dict,
 ) -> None:
-    print(f"\n{dataset_name}")
+    print(f"\n{display_domain_name(dataset_name, include_id=True)}")
 
     for split_name in ["train", "val", "test"]:
         info = summary[split_name]
@@ -911,28 +912,28 @@ def main() -> None:
 
     source = normalize_common_dataset(
         source,
-        "Source dataset",
+        f"{display_domain_name('source', include_id=True)} dataset",
     )
 
     kaggle = normalize_common_dataset(
         kaggle,
-        "Kaggle dataset",
+        f"{display_domain_name('kaggle', include_id=True)} dataset",
     )
 
     print_header("VALIDATING CANONICAL DATA")
 
     validate_common_dataset(
         source,
-        "Source dataset",
+        f"{display_domain_name('source', include_id=True)} dataset",
     )
 
     validate_common_dataset(
         kaggle,
-        "Kaggle dataset",
+        f"{display_domain_name('kaggle', include_id=True)} dataset",
     )
 
-    print("Source canonical dataset: OK")
-    print("Kaggle canonical dataset: OK")
+    print(f"{DOMAIN_DISPLAY_NAMES['source']} canonical dataset: OK")
+    print(f"{DOMAIN_DISPLAY_NAMES['kaggle']} canonical dataset: OK")
 
     # -------------------------------------------------------------------------
     # Duplicate diagnostics.
@@ -944,12 +945,12 @@ def main() -> None:
     kaggle_duplicates = duplicate_statistics(kaggle)
 
     print_duplicate_statistics(
-        "Source",
+        "source",
         source_duplicates,
     )
 
     print_duplicate_statistics(
-        "Kaggle",
+        "kaggle",
         kaggle_duplicates,
     )
 
@@ -972,13 +973,13 @@ def main() -> None:
     validate_split_indices(
         source_split_indices,
         len(source),
-        "Source dataset",
+        f"{display_domain_name('source', include_id=True)} dataset",
     )
 
     validate_split_indices(
         kaggle_split_indices,
         len(kaggle),
-        "Kaggle dataset",
+        f"{display_domain_name('kaggle', include_id=True)} dataset",
     )
 
     source_split_summary = summarize_splits(
@@ -992,12 +993,12 @@ def main() -> None:
     )
 
     print_split_summary(
-        "Source",
+        "source",
         source_split_summary,
     )
 
     print_split_summary(
-        "Kaggle",
+        "kaggle",
         kaggle_split_summary,
     )
 
@@ -1093,7 +1094,7 @@ def main() -> None:
     )
 
     print(
-        "\nSource-only variables excluded from "
+        f"\n{DOMAIN_DISPLAY_NAMES['source']}-only variables excluded from "
         "cross-domain experiments:"
     )
 

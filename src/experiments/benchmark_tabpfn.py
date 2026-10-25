@@ -25,6 +25,7 @@ from src.experiments.runner import (
 from src.experiments.sampling import Partition, sampling_metadata, select_training
 from src.models.base import ModelAdapter
 from src.paths import PROJECT_ROOT, RESULTS_DIR
+from src.domain_labels import display_domain_name
 
 REFERENCE_BATCH_SIZE = 256
 RTOL = 1e-5
@@ -298,7 +299,9 @@ def run(
         write_training_sample(output, config.train_domain, selected.provenance)
         provenance.to_csv(output / "validation_queries.csv.gz", index=False, compression="gzip")
         print(
-            f"Selected {len(selected.X)} training context rows and {len(queries)} validation queries; "
+            f"Selected {len(selected.X)} training context rows for "
+            f"{display_domain_name(config.train_domain, include_id=True)} and "
+            f"{len(queries)} validation queries; "
             f"requested device={device}, precision=float32. No test partitions.",
             flush=True,
         )

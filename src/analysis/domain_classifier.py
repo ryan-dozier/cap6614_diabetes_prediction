@@ -26,6 +26,7 @@ except ImportError as exc:
     ) from exc
 
 from src.data import load_schema, load_split
+from src.domain_labels import DOMAIN_DISPLAY_NAMES, display_domain_name
 from src.paths import DOMAIN_CLASSIFIER_DIR as OUTPUT_DIR, PROJECT_ROOT as ROOT
 
 
@@ -152,8 +153,8 @@ def create_balanced_domain_split(
 
     if len(kaggle) < len(source):
         raise ValueError(
-            f"Kaggle {split} split contains fewer rows than "
-            f"the source {split} split."
+            f"{display_domain_name('kaggle', include_id=True)} {split} split contains fewer rows than "
+            f"{display_domain_name('source', include_id=True)} {split} split."
         )
 
     # -------------------------------------------------------------------------
@@ -498,17 +499,20 @@ def print_metrics(
     matrix = metrics["confusion_matrix"]
 
     print("\nConfusion matrix:")
-    print("                 Pred source   Pred Kaggle")
+    names = [DOMAIN_DISPLAY_NAMES["source"], DOMAIN_DISPLAY_NAMES["kaggle"]]
+    row_width = max(len(f"True {name}") for name in names)
+    column_width = max(14, *(len(f"Pred {name}") for name in names))
     print(
-        f"True source      "
-        f"{matrix[0][0]:>11,}   "
-        f"{matrix[0][1]:>11,}"
+        f"{'':>{row_width}} "
+        f"{'Pred ' + names[0]:>{column_width}}  "
+        f"{'Pred ' + names[1]:>{column_width}}"
     )
-    print(
-        f"True Kaggle      "
-        f"{matrix[1][0]:>11,}   "
-        f"{matrix[1][1]:>11,}"
-    )
+    for index, name in enumerate(names):
+        print(
+            f"{'True ' + name:>{row_width}} "
+            f"{matrix[index][0]:>{column_width},}  "
+            f"{matrix[index][1]:>{column_width},}"
+        )
 
 
 # =============================================================================
@@ -622,15 +626,8 @@ def print_dataset_summary(
 
         print(f"\n{split.capitalize()}:")
 
-        print(
-            f"  Source: "
-            f"{summary['source_rows']:,}"
-        )
-
-        print(
-            f"  Kaggle: "
-            f"{summary['kaggle_rows']:,}"
-        )
+        print(f"  {DOMAIN_DISPLAY_NAMES['source']:<20} {summary['source_rows']:,}")
+        print(f"  {DOMAIN_DISPLAY_NAMES['kaggle']:<20} {summary['kaggle_rows']:,}")
 
         print(
             f"  Total:  "

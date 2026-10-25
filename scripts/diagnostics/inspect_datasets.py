@@ -1,5 +1,6 @@
 import pandas as pd
 
+from src.domain_labels import DOMAIN_DISPLAY_NAMES, display_domain_name
 from src.paths import (
     KAGGLE_RAW_PATH as KAGGLE_PATH,
     SOURCE_RAW_PATH as SOURCE_PATH,
@@ -23,8 +24,8 @@ def main():
     kaggle[TARGET] = kaggle[TARGET].astype("int64")
 
     print_header("DATASET SHAPES")
-    print(f"Source: {source.shape}")
-    print(f"Kaggle: {kaggle.shape}")
+    print(f"{display_domain_name('source', include_id=True)}: {source.shape}")
+    print(f"{display_domain_name('kaggle', include_id=True)}: {kaggle.shape}")
 
     # -------------------------------------------------------------------------
     # Determine shared and dataset-specific features.
@@ -47,12 +48,12 @@ def main():
 
     print(f"\nTotal shared features: {len(shared)}")
 
-    print_header("SOURCE-ONLY FEATURES")
+    print_header(f"{DOMAIN_DISPLAY_NAMES['source'].upper()}-ONLY FEATURES")
 
     for feature in source_only:
         print(feature)
 
-    print_header("KAGGLE-ONLY FEATURES")
+    print_header(f"{DOMAIN_DISPLAY_NAMES['kaggle'].upper()}-ONLY FEATURES")
 
     if kaggle_only:
         for feature in kaggle_only:
@@ -66,14 +67,14 @@ def main():
 
     print_header("TARGET DISTRIBUTIONS")
 
-    print("\nSource:")
+    print(f"\n{DOMAIN_DISPLAY_NAMES['source']}:")
     print(
         source[TARGET]
         .value_counts(normalize=True)
         .sort_index()
     )
 
-    print("\nKaggle:")
+    print(f"\n{DOMAIN_DISPLAY_NAMES['kaggle']}:")
     print(
         kaggle[TARGET]
         .value_counts(normalize=True)
@@ -86,7 +87,7 @@ def main():
 
     print_header("MISSING VALUES")
 
-    print("\nSource:")
+    print(f"\n{DOMAIN_DISPLAY_NAMES['source']}:")
     print(
         source[shared]
         .isna()
@@ -94,7 +95,7 @@ def main():
         .sort_values(ascending=False)
     )
 
-    print("\nKaggle:")
+    print(f"\n{DOMAIN_DISPLAY_NAMES['kaggle']}:")
     print(
         kaggle[shared]
         .isna()
@@ -108,10 +109,10 @@ def main():
 
     print_header("DATA TYPES")
 
-    print("\nSource:")
+    print(f"\n{DOMAIN_DISPLAY_NAMES['source']}:")
     print(source[shared].dtypes)
 
-    print("\nKaggle:")
+    print(f"\n{DOMAIN_DISPLAY_NAMES['kaggle']}:")
     print(kaggle[shared].dtypes)
 
     # -------------------------------------------------------------------------
@@ -173,8 +174,8 @@ def main():
         )
 
         print(f"\n{feature}")
-        print(f"  Source: {source_values}")
-        print(f"  Kaggle: {kaggle_values}")
+        print(f"  {DOMAIN_DISPLAY_NAMES['source']}: {source_values}")
+        print(f"  {DOMAIN_DISPLAY_NAMES['kaggle']}: {kaggle_values}")
 
         if source_values == kaggle_values:
             print("  MATCH")
@@ -199,7 +200,7 @@ def main():
     #
     # Standardized mean difference:
     #
-    #     (Kaggle mean - Source mean) / pooled standard deviation
+    #     (Playground mean - Original Synthetic mean) / pooled standard deviation
     #
     # This gives a rough measure of distribution shift on a common scale.
     # -------------------------------------------------------------------------
@@ -256,7 +257,12 @@ def main():
                 "kaggle_std",
                 "standardized_difference",
             ]
-        ].to_string(
+        ].rename(columns={
+            "source_mean": f"{DOMAIN_DISPLAY_NAMES['source']} mean",
+            "kaggle_mean": f"{DOMAIN_DISPLAY_NAMES['kaggle']} mean",
+            "source_std": f"{DOMAIN_DISPLAY_NAMES['source']} std",
+            "kaggle_std": f"{DOMAIN_DISPLAY_NAMES['kaggle']} std",
+        }).to_string(
             index=False,
             float_format=lambda value: f"{value:.4f}",
         )
@@ -268,11 +274,11 @@ def main():
 
     print_header("SUMMARY")
 
-    print(f"Source rows:             {len(source):,}")
-    print(f"Kaggle rows:             {len(kaggle):,}")
+    print(f"{DOMAIN_DISPLAY_NAMES['source']} rows:             {len(source):,}")
+    print(f"{DOMAIN_DISPLAY_NAMES['kaggle']} rows:             {len(kaggle):,}")
     print(f"Shared features:         {len(shared)}")
-    print(f"Source-only features:    {len(source_only)}")
-    print(f"Kaggle-only features:    {len(kaggle_only)}")
+    print(f"{DOMAIN_DISPLAY_NAMES['source']}-only features:    {len(source_only)}")
+    print(f"{DOMAIN_DISPLAY_NAMES['kaggle']}-only features:    {len(kaggle_only)}")
     print(f"Categorical features:    {len(categorical_features)}")
     print(f"Numeric features:        {len(numeric_features)}")
     print(

@@ -7,6 +7,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
+from src.domain_labels import display_domain_name
+
 import numpy as np
 import pandas as pd
 
@@ -1654,7 +1656,7 @@ def main() -> None:
         feature_set,
     ) in smoke_configs:
         print(
-            f"\n{domain.upper()} "
+            f"\n{display_domain_name(domain, include_id=True)} "
             f"[{feature_set}]"
         )
 
@@ -1709,7 +1711,7 @@ def main() -> None:
         )
 
         print(
-            f"{domain:<8} "
+            f"{display_domain_name(domain, include_id=True):<32} "
             f"X={X.shape} "
             f"y={y.shape} "
             f"target_dtype={y.dtype}"
@@ -1740,7 +1742,7 @@ def main() -> None:
     )
 
     print(
-        "\nKaggle test with explicit id: "
+        "\nPlayground S5E12 test (kaggle) with explicit id: "
         f"{X_with_id.shape}"
     )
 
@@ -1761,7 +1763,7 @@ def main() -> None:
     )
 
     print(
-        "\nNHANES test with explicit SEQN: "
+        "\nNHANES 2015–2016 test (nhanes) with explicit SEQN: "
         f"{nhanes_with_seqn.shape}"
     )
 

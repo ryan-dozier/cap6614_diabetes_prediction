@@ -28,6 +28,7 @@ from src.experiments.results import (
 from src.experiments.sampling import Partition, partition_summary, sampling_metadata, select_training
 from src.models.base import ModelAdapter
 from src.paths import PROJECT_ROOT
+from src.domain_labels import display_domain_name
 
 LOGGER = logging.getLogger(__name__)
 
@@ -225,7 +226,7 @@ def run(config: ExperimentConfig) -> Path:
             metadata["prediction_duration_seconds"][domain] = time.perf_counter() - predict_started
             evaluation = evaluate_binary(test.y, probability, config.threshold, config.calibration_bins)
             for warning in evaluation["warnings"]:
-                LOGGER.warning("%s/test: %s", domain, warning)
+                LOGGER.warning("%s/test: %s", display_domain_name(domain, include_id=True), warning)
             predictions = test.provenance.copy()
             predictions.insert(0, "split", "test")
             predictions.insert(0, "domain", domain)
@@ -238,11 +239,17 @@ def run(config: ExperimentConfig) -> Path:
             metadata["resources"] = adapter.resource_metadata()
             write_json(output / "metadata.json", metadata)
 
-        print(f"{'domain':<10} {'ROC-AUC':>10} {'avg prec.':>10} {'F1':>10} {'Brier':>10}")
+        domain_width = max(
+            len(display_domain_name(domain, include_id=True)) for domain in evaluations
+        )
+        print(f"{'domain':<{domain_width}} {'ROC-AUC':>10} {'avg prec.':>10} {'F1':>10} {'Brier':>10}")
         for domain, evaluation in evaluations.items():
             scores = [evaluation[key] for key in ("roc_auc", "average_precision", "f1", "brier_score")]
             formatted = [f"{score:.6f}" if score is not None else "null" for score in scores]
-            print(f"{domain:<10} " + " ".join(f"{value:>10}" for value in formatted))
+            print(
+                f"{display_domain_name(domain, include_id=True):<{domain_width}} "
+                + " ".join(f"{value:>10}" for value in formatted)
+            )
         print(f"Output: {output}")
         metadata.update(
             status="completed", ended_at_utc=utc_now(),

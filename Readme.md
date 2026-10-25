@@ -1,6 +1,14 @@
 # Synthetic Tabular Data Under Distribution Shift
 
-This project studies how diabetes-prediction models trained on synthetic tabular data generalize across synthetic generators and to real survey data. Source and Kaggle are both synthetic; NHANES 2015–2016 provides the real-data evaluation domain. CatBoost is the reference model, and pretrained TabPFN provides the current tabular foundation-model comparison.
+This project studies how diabetes-prediction models trained on synthetic tabular data generalize across synthetic generators and to real survey data. **Original Synthetic: the 100,000-row Diabetes Health Indicators Dataset published on Kaggle by Mohan Krishna Thalla.** This is a descriptive project label, not an independently verified claim about original authorship or the complete generation history. Original Synthetic and Playground S5E12 are both synthetic; NHANES 2015–2016 is real survey data. CatBoost is the reference model, and pretrained TabPFN provides the current tabular foundation-model comparison.
+
+| Internal ID | Display name | Dataset |
+|---|---|---|
+| `source` | Original Synthetic | Diabetes Health Indicators Dataset, 100,000 rows |
+| `kaggle` | Playground S5E12 | Kaggle Playground Series Season 5 Episode 12 |
+| `nhanes` | NHANES 2015–2016 | National Health and Nutrition Examination Survey |
+
+Both synthetic datasets are hosted on Kaggle; the internal ID `kaggle` specifically means Playground S5E12. The downloaded Original Synthetic `diabetes_dataset.csv` exactly matches the local CSV (SHA-256 below).
 
 ## Current Status
 
@@ -10,13 +18,13 @@ Status as of 2026-10-25:
 |---|---|
 | Preparation, harmonization, and fixed splits | Completed |
 | Distribution-shift analysis, domain classification, and feature ablation | Completed |
-| Full-data Source and Kaggle CatBoost evaluations | Completed |
-| Matched Source n2000 CatBoost and float32 TabPFN evaluations | Completed |
-| Source and Kaggle validation-only TabPFN benchmarks | Completed; batch 1024 selected among tested settings |
-| Matched Kaggle n2000 CatBoost and float32 TabPFN evaluations | Pending |
+| Full-data Original Synthetic and Playground S5E12 CatBoost evaluations | Completed |
+| Matched Original Synthetic n2000 CatBoost and float32 TabPFN evaluations | Completed |
+| Original Synthetic and Playground S5E12 validation-only TabPFN benchmarks | Completed; batch 1024 selected among tested settings |
+| Matched Playground S5E12 n2000 CatBoost and float32 TabPFN batch-1024 evaluations | Completed |
 | TabICL and FT-Transformer | Not implemented |
 
-The next predictive comparison uses Kaggle n2000 CatBoost and Kaggle n2000 float32 TabPFN with batch size 1024. Completed Source results do not need rerunning solely for speed. Benchmark measurements are computational results, not additional predictive evaluations.
+Matched n2000 CatBoost and float32 TabPFN batch-1024 results for both synthetic domains are complete. The Playground S5E12 results are in `results/predictive/catboost_kaggle_strict_common_16_n2000_seed42/` and `results/predictive/tabpfn_v35_kaggle_strict_common_16_n2000_float32_seed42_batch1024/`. The Original Synthetic batch-256 predictive results are complete and remain valid; rerunning them at batch 1024 is optional and only for a runtime comparison. Benchmark measurements are computational results, not additional predictive evaluations.
 
 ## Environment Setup
 
@@ -136,12 +144,13 @@ Before running setup, manually place the original, unmodified CSV files at:
 
 | Dataset | Required local file | Acquisition |
 |---|---|---|
-| Source: Diabetes Health Indicators Dataset (Mohan Krishna Thalla) | `data/raw/source/diabetes_dataset.csv` | Download and extract `diabetes_dataset.csv` from [the verified Kaggle dataset](https://www.kaggle.com/datasets/mohankrishnathalla/diabetes-health-indicators-dataset). Check the file hash below. |
-| Kaggle Playground Series S5E12 | `data/raw/kaggle_s5e12/train.csv` | Download `train.csv` from the competition's Data page, completing any required access steps. |
+| Original Synthetic (`source`): Diabetes Health Indicators Dataset (Mohan Krishna Thalla) | `data/raw/source/diabetes_dataset.csv` | Download and extract `diabetes_dataset.csv` from [the verified Kaggle dataset](https://www.kaggle.com/datasets/mohankrishnathalla/diabetes-health-indicators-dataset). Check the file hash below. |
+| Playground S5E12 (`kaggle`) | `data/raw/kaggle_s5e12/train.csv` | Download `train.csv` from the competition's Data page, completing any required access steps. |
 
-**Verified Source provenance (2026-10-25):** the `diabetes_dataset.csv` retrieved
+**Verified Original Synthetic provenance (2026-10-25):** the `diabetes_dataset.csv` retrieved
 from Kaggle dataset `mohankrishnathalla/diabetes-health-indicators-dataset` is
-byte-for-byte identical to the project's local Source file. Both have SHA-256:
+byte-for-byte identical to the project's local Original Synthetic file. Both
+have SHA-256:
 
 ```text
 72ced87cdffdbc2dd594aa214a11c3561498200980def2958e2610413eb29bef
@@ -155,11 +164,10 @@ file contents. To verify a downloaded copy from the project root on Linux/WSL:
 sha256sum data/raw/source/diabetes_dataset.csv
 ```
 
-“Source” is the project's domain label. Both this dataset and the competition
-training data are hosted on Kaggle; “Kaggle” in experiment configurations refers
-specifically to Playground Series S5E12. Source-to-Kaggle evaluation studies
-synthetic-to-synthetic distribution shift, while NHANES provides the real-data
-evaluation domain.
+The internal ID `source` is displayed as “Original Synthetic.” The display name
+does not independently verify authorship or the complete generation history.
+Comparing these two synthetic datasets studies synthetic-to-synthetic
+distribution shift; NHANES 2015–2016 is the real survey-data evaluation domain.
 
 The related Hugging Face `MaxPrestige/Synthetic-Diabetes-Dataset` has a different
 published schema and is not the verified file reference for this project. File
@@ -170,7 +178,7 @@ Setup does not download these CSVs. Preparation records raw-file hashes in `data
 
 Setup downloads NHANES 2015–2016 components through `scripts/download_nhanes_2015_2016.sh`, then harmonizes them and creates fixed splits. Existing downloaded files are skipped.
 
-Source/Kaggle preparation retains their 24 shared predictors for two-domain analyses. Primary predictive experiments across all three domains use `strict_common_16`. The harmonized `common_20` and `common_22` feature sets are available for sensitivity studies; their existence does not imply those experiments are completed.
+Original Synthetic/Playground S5E12 preparation retains their 24 shared predictors for two-domain analyses. Primary predictive experiments across all three domains use `strict_common_16`. The harmonized `common_20` and `common_22` feature sets are available for sensitivity studies; their existence does not imply those experiments are completed.
 
 ### Expected Setup Order
 
@@ -216,13 +224,15 @@ domain_feature_ablation.py
 ### Shared Predictive Experiments
 
 The predictive framework evaluates robustness under synthetic generator shift
-(Source and Kaggle are **both synthetic**) and synthetic-to-real shift to NHANES.
+(Original Synthetic and Playground S5E12 are **both synthetic**) and
+synthetic-to-real shift to NHANES 2015–2016.
 CatBoost is the reference adapter. Local pretrained TabPFN classification is also
 supported; TabICL and FT-Transformer are not implemented yet.
 
-The first configuration fits **one** CatBoost model with seed 42 on Source
-`train`, using Source `val` exclusively for early stopping and best-model
-selection. That same model predicts Source, Kaggle, and NHANES `test` using the
+The first configuration fits **one** CatBoost model with seed 42 on Original
+Synthetic (`source`) `train`, using the same domain's `val` exclusively for
+early stopping and best-model selection. That same model predicts Original
+Synthetic, Playground S5E12, and NHANES 2015–2016 `test` using the
 ordered `strict_common_16` features. Test sets never select models, preprocessing,
 thresholds, or calibration. There is **no target-domain validation** or use of
 NHANES labels during fitting/model selection in this initial synthetic-to-real
@@ -298,8 +308,8 @@ machine. CUDA is checked when the adapter is instantiated; a requested unavailab
 CUDA device is an error, never an automatic CPU fallback.
 
 The new configurations use `strict_common_16`, model seed 42, **2,000 stratified
-training rows**, sampling seed 42, and the complete fixed test splits (Source
-15,000; Kaggle 105,000; NHANES 646). Validation and test sets are not sampled in
+training rows**, sampling seed 42, and the complete fixed test splits (Original
+Synthetic 15,000; Playground S5E12 105,000; NHANES 2015–2016 646). Validation and test sets are not sampled in
 these experiments. A 2,000-row budget is an initial experiment choice, **not** a
 package limit or a guarantee of fitting into 8 GB VRAM.
 
@@ -386,9 +396,8 @@ adapter = TabPFNAdapter.load(
 ```
 
 Use the explicit float32 batch-1024 configurations in the benchmark section below
-for upcoming n2000 TabPFN experiments. That section identifies the pending Kaggle
-comparison and its commands. Original batch-256 and autocast configurations are
-retained for reproducibility and diagnostics; the Source autocast smoke test
+for n2000 TabPFN experiments. Original batch-256 and autocast configurations are
+retained for reproducibility and diagnostics; the Original Synthetic autocast smoke test
 exceeded the strict chunk-equivalence tolerance, while float32 passed. Existing
 full-data CatBoost configurations and completed results are unchanged.
 
@@ -401,7 +410,7 @@ python3 -m src.experiments.smoke_tabpfn \
   --sample-size 64 --query-size 33 --batch-size 16
 ```
 
-This uses Source train/validation only, never loads test partitions, performs no
+This uses Original Synthetic (`source`) train/validation only, never loads test partitions, performs no
 metric-based selection, and does not download weights. It measures chunked versus
 unchunked probabilities, saves/restores the fitted state, checks reload predictions,
 and writes differences plus status to `smoke.json` separately from research
@@ -426,9 +435,9 @@ batch size, maximum/mean probability differences, and threshold disagreements
 in the smoke report. A passing small float32 smoke check does not establish
 autocast equivalence or change the precision used by research configurations.
 
-Resource-feasibility check (2026-10-23): the exact Source 2,000-row context
-(800 negative / 1,200 positive), first 257 deterministic Source validation
-queries, and 256+1 prediction chunks passed with explicit float32 on the RTX
+Resource-feasibility check (2026-10-23): the exact Original Synthetic
+2,000-row context (800 negative / 1,200 positive), first 257 deterministic
+Original Synthetic validation queries, and 256+1 prediction chunks passed with explicit float32 on the RTX
 4060 Laptop GPU. Four estimators, seed 42, v3.5 checkpoint, and
 `fit_preprocessors` were unchanged. The report is
 `results/smoke/tabpfn_source_n2000_float32/smoke.json`.
@@ -447,15 +456,16 @@ unchunked comparison is explicitly recorded without classifying the successful
 intended path as failed or retrying with changed settings; other failures stop
 the check and preserve available diagnostics.
 
-The Source-trained float32 research run completed successfully, evaluating all
-three complete test splits in approximately 16 minutes. Its matched 2,000-row
-CatBoost reference also completed, with identical training identities and order.
-The Kaggle-trained n2000 float32 research run and matched n2000 CatBoost
-baseline remain pending: available saved metadata confirms only a full-data
-Kaggle CatBoost run completed, not its n2000 baseline. The completed Source
-predictive results remain valid and do not need rerunning solely for speed.
-Use the explicit batch-1024 TabPFN configurations below for upcoming n2000
-float32 experiments; the batch-256 and autocast configurations are preserved.
+The Original Synthetic-trained float32 batch-256 TabPFN research run completed
+successfully, evaluating all three complete test splits in approximately
+16 minutes. Its matched 2,000-row CatBoost reference also completed with
+identical training identities and order. The completed Playground S5E12 n2000
+CatBoost and float32 TabPFN batch-1024 results are recorded in
+`results/predictive/catboost_kaggle_strict_common_16_n2000_seed42/` and
+`results/predictive/tabpfn_v35_kaggle_strict_common_16_n2000_float32_seed42_batch1024/`.
+The completed Original Synthetic batch-256 predictive run remains valid; its
+batch-1024 rerun is optional and solely for runtime comparison. Batch-256 and
+autocast configurations are preserved.
 
 ### Validation-only TabPFN inference benchmark
 
@@ -465,25 +475,27 @@ loads only configured train and same-domain validation partitions through
 `src.data`, never requests a test partition, calculates no predictive metrics,
 and does not change research configurations or their saved outputs.
 
-Completed Source and Kaggle benchmarks each used 2,000 training rows, 2,049
-same-domain validation queries, explicit float32, batches 256/512/1024, and three
+Completed Original Synthetic and Playground S5E12 benchmarks each used 2,000
+training rows, 2,049 same-domain validation queries, explicit float32, batches
+256/512/1024, and three
 measured repetitions after one full-query warm-up per case on the RTX 4060 Laptop
 GPU. Saved reports are under
 `results/benchmarks/tabpfn_source_n2000_float32/` and
 `results/benchmarks/tabpfn_kaggle_n2000_float32/`.
 
-| Training/query domain | Batch 256 median (s) | Batch 1024 median (s) | Measured speedup |
+| Training/query dataset | Batch 256 median (s) | Batch 1024 median (s) | Measured speedup |
 |---|---:|---:|---:|
-| Source | 21.8232 | 8.3923 | 2.6004x |
-| Kaggle | 17.7591 | 6.8744 | 2.5834x |
+| Original Synthetic | 21.8232 | 8.3923 | 2.6004x |
+| Playground S5E12 | 17.7591 | 6.8744 | 2.5834x |
 
-Median throughput increased from 93.8909 to 244.1513 rows/s for Source and from
-115.3775 to 298.0624 rows/s for Kaggle. Batch 512 medians were 12.1719 s
+Median throughput increased from 93.8909 to 244.1513 rows/s for Original
+Synthetic and from 115.3775 to 298.0624 rows/s for Playground S5E12. Batch 512
+medians were 12.1719 s
 (168.3391 rows/s) and 10.6220 s (192.9017 rows/s), respectively.
 **Batch 1024 was the fastest numerically eligible tested setting in both domains.**
 All measured repetitions passed the unchanged `rtol=1e-5, atol=1e-6` criterion,
 with maximum reference probability differences of `1.1920928955078125e-7`
-(Source) and `1.4901161193847656e-7` (Kaggle), and zero threshold disagreements.
+(Original Synthetic) and `1.4901161193847656e-7` (Playground S5E12), and zero threshold disagreements.
 For batch 1024, both domains recorded peak allocated memory of 2,346,739,200
 bytes and peak reserved memory of 2,982,150,144 bytes (approximately 2.78 GiB
 reserved). These are process PyTorch allocator peaks, not total GPU usage.
@@ -496,24 +508,20 @@ thermal/cache effects, and same-domain validation queries limit interpretation:
 neither the same speedup on complete cross-domain evaluation workloads nor
 equivalence under different settings or hardware is guaranteed.
 
-Both explicit batch-1024 research configurations are available (neither new
-research experiment has completed):
+The explicit batch-1024 configurations are available. The Playground S5E12
+run has completed; the Original Synthetic batch-1024 rerun is optional:
 
 ```bash
 python3 -m src.experiments.runner --config configs/tabpfn_source_n2000_float32_batch1024.json
-python3 -m src.experiments.runner --config configs/tabpfn_kaggle_n2000_float32_batch1024.json
 ```
 
-Each has a distinct experiment/output name ending in `_batch1024`. The Source
-command is optional; existing completed Source results need no speed-only rerun.
-The next pending matched comparison is the Kaggle batch-1024 TabPFN command
-above and its unchanged n2000 CatBoost baseline:
+The completed Playground S5E12 batch-1024 TabPFN output is
+`results/predictive/tabpfn_v35_kaggle_strict_common_16_n2000_float32_seed42_batch1024/`;
+its matched n2000 CatBoost output is
+`results/predictive/catboost_kaggle_strict_common_16_n2000_seed42/`.
+Do not rerun either completed configuration into its existing protected output.
 
-```bash
-python3 -m src.experiments.runner --config configs/catboost_kaggle_n2000.json
-```
-
-With `synthetic-tabular-ai` activated, the completed Source benchmark was run
+With `synthetic-tabular-ai` activated, the completed Original Synthetic benchmark was run
 from the project root as follows (use a fresh output name to repeat it):
 
 ```bash
@@ -536,7 +544,7 @@ never reused.
 
 The context is selected with the existing deterministic training sampler.
 Validation queries are sorted by authoritative identity (`row_index` for
-Source/Kaggle, `seqn` for NHANES), then the first `query_size` rows are used.
+Original Synthetic/Playground S5E12, `seqn` for NHANES 2015–2016), then the first `query_size` rows are used.
 Selection does not use validation labels. Full train/validation identities must
 be disjoint. Training context, query order, feature order, checkpoint, model
 seed, ensemble count, precision, fit mode, and memory-saving settings are held
@@ -610,13 +618,13 @@ or `not_run` (and `running` while active).
 
 ### `scripts/diagnostics/inspect_datasets.py`
 
-Performs an initial inspection of the raw source and Kaggle datasets.
+Performs an initial inspection of the raw Original Synthetic and Playground S5E12 datasets.
 
 The script:
 
 - reports dataset shapes and target distributions;
 - identifies features shared between the two datasets;
-- identifies source-only and Kaggle-only columns;
+- identifies Original Synthetic-only and Playground S5E12-only columns;
 - checks missing values and data types;
 - separates categorical and numeric features;
 - verifies that categorical features use compatible category values;
@@ -637,7 +645,7 @@ This script is primarily a diagnostic tool and does not modify the datasets.
 
 Creates the canonical datasets used by the experiments.
 
-The project uses the 24 predictors shared by the source and Kaggle datasets. Source-only variables and the Kaggle `id` column are excluded from the normal cross-domain feature space.
+The project uses the 24 predictors shared by the Original Synthetic and Playground S5E12 datasets. Original Synthetic-only variables and the Playground S5E12 `id` column are excluded from the normal cross-domain feature space.
 
 The script:
 
@@ -645,7 +653,7 @@ The script:
 - enforces the frozen shared-feature schema;
 - validates numeric values and categorical vocabularies;
 - checks for missing values and duplicate rows;
-- creates canonical source and Kaggle datasets;
+- creates canonical Original Synthetic and Playground S5E12 datasets;
 - creates deterministic stratified train/validation/test splits using seed `42`;
 - preserves original row identity through split-assignment files; and
 - records dataset metadata and raw-file hashes for reproducibility.
@@ -717,16 +725,16 @@ This verifies the prepared schema, fixed splits, and feature/target loading.
 
 ### `src/analysis/domain_classifier.py`
 
-Measures how easily the source and Kaggle-generated distributions can be distinguished.
+Measures how easily the Original Synthetic and Playground S5E12 distributions can be distinguished.
 
 The script constructs a balanced binary domain-classification problem:
 
 ```text
-domain = 0 -> source dataset
-domain = 1 -> Kaggle-generated dataset
+domain = 0 -> Original Synthetic (`source`)
+domain = 1 -> Playground S5E12 (`kaggle`)
 ```
 
-For each train, validation, and test partition, Kaggle examples are deterministically downsampled to match the number of source examples.
+For each train, validation, and test partition, Playground S5E12 examples are deterministically downsampled to match the number of Original Synthetic examples.
 
 Only the 24 shared predictors are provided to the classifier. The following are explicitly excluded from model input:
 
@@ -768,13 +776,13 @@ results/domain_classifier/
 └── sampling_provenance.csv.gz
 ```
 
-`sampling_provenance.csv.gz` records the exact source and Kaggle rows used in the balanced domain experiment so later experiments can reproduce the same samples.
+`sampling_provenance.csv.gz` records the exact Original Synthetic and Playground S5E12 rows used in the balanced domain experiment so later experiments can reproduce the same samples.
 
 ---
 
 ### `src/analysis/analyze_distribution_shift.py`
 
-Performs a more detailed statistical analysis of the differences between the source and Kaggle distributions.
+Performs a more detailed statistical analysis of the differences between the Original Synthetic and Playground S5E12 distributions.
 
 For numeric features, the analysis includes:
 
@@ -876,13 +884,13 @@ results/domain_feature_ablation/
     └── accuracy_vs_removed_features.png
 ```
 
-The primary question addressed by this experiment is whether a smaller set of artifact-heavy features accounts for most of the distinguishability between the source and Kaggle-generated datasets.
+The primary question addressed by this experiment is whether a smaller set of artifact-heavy features accounts for most of the distinguishability between the Original Synthetic and Playground S5E12 datasets.
 
 ## Running the Current Analysis Pipeline
 
-With the Conda environment activated and the manually acquired Source/Kaggle raw datasets in their expected locations, run the following from the project root. The NHANES downloader skips existing files.
+With the Conda environment activated and the manually acquired Original Synthetic/Playground S5E12 raw datasets in their expected locations, run the following from the project root. The NHANES downloader skips existing files.
 
-Both Source/Kaggle and NHANES preparation must finish before running `src.data`: its smoke test validates all three domains and requires NHANES feature metadata and split assignments.
+Both Original Synthetic/Playground S5E12 and NHANES preparation must finish before running `src.data`: its smoke test validates all three domains and requires NHANES feature metadata and split assignments.
 
 ```bash
 python3 -m scripts.diagnostics.inspect_datasets

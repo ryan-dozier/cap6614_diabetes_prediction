@@ -28,6 +28,7 @@ except ImportError as exc:
     ) from exc
 
 from src.data import load_common, load_schema
+from src.domain_labels import DOMAIN_DISPLAY_NAMES
 from src.paths import (
     DOMAIN_CLASSIFIER_DIR,
     DOMAIN_FEATURE_ABLATION_DIR as OUTPUT_DIR,
@@ -612,8 +613,8 @@ def load_experiment_inputs() -> ExperimentInputs:
         print(
             f"{split.capitalize():5s}: "
             f"{len(dataset.y):,} rows "
-            f"({int((dataset.y == 0).sum()):,} source, "
-            f"{int((dataset.y == 1).sum()):,} Kaggle)"
+            f"({int((dataset.y == 0).sum()):,} {DOMAIN_DISPLAY_NAMES['source']}, "
+            f"{int((dataset.y == 1).sum()):,} {DOMAIN_DISPLAY_NAMES['kaggle']})"
         )
 
     print("\nFixed removal rankings loaded:")
@@ -1229,7 +1230,8 @@ def main() -> None:
     print(METADATA_PATH.relative_to(ROOT))
 
     print(
-        "\nInterpretation: lower domain ROC-AUC after removal means the "
+        f"\nInterpretation: lower {DOMAIN_DISPLAY_NAMES['source']} vs. "
+        f"{DOMAIN_DISPLAY_NAMES['kaggle']} domain ROC-AUC after removal means the "
         "remaining feature set contains less information about whether a row "
         "originated from the source or Kaggle-generated distribution."
     )

@@ -20,6 +20,7 @@ from src.data import (
     load_metadata,
     load_schema,
 )
+from src.domain_labels import DOMAIN_DISPLAY_NAMES
 from src.paths import (
     DISTRIBUTION_SHIFT_DIR as OUTPUT_DIR,
     DOMAIN_CLASSIFIER_DIR,
@@ -323,12 +324,12 @@ def load_analysis_inputs():
     schema = load_schema()
 
     print(
-        f"Source rows: "
+        f"{DOMAIN_DISPLAY_NAMES['source']} rows: "
         f"{len(source):,}"
     )
 
     print(
-        f"Kaggle rows: "
+        f"{DOMAIN_DISPLAY_NAMES['kaggle']} rows: "
         f"{len(kaggle):,}"
     )
 
@@ -1447,14 +1448,14 @@ def save_numeric_distribution_plot(
             x - width / 2,
             source_values,
             width,
-            label="Source",
+            label=DOMAIN_DISPLAY_NAMES["source"],
         )
 
         ax.bar(
             x + width / 2,
             kaggle_values,
             width,
-            label="Kaggle",
+            label=DOMAIN_DISPLAY_NAMES["kaggle"],
         )
 
         ax.set_xticks(x)
@@ -1476,8 +1477,8 @@ def save_numeric_distribution_plot(
             density=True,
             alpha=0.6,
             label=[
-                "Source",
-                "Kaggle",
+                DOMAIN_DISPLAY_NAMES["source"],
+                DOMAIN_DISPLAY_NAMES["kaggle"],
             ],
         )
 
@@ -1488,7 +1489,8 @@ def save_numeric_distribution_plot(
     ax.set_xlabel(feature)
 
     ax.set_title(
-        f"Source vs. Kaggle: {feature}"
+        f"{DOMAIN_DISPLAY_NAMES['source']} vs. "
+        f"{DOMAIN_DISPLAY_NAMES['kaggle']}: {feature}"
     )
 
     ax.legend()
@@ -1883,6 +1885,12 @@ def print_numeric_summary(
         numeric[
             columns
         ]
+        .rename(columns={
+            "std_ratio_kaggle_to_source": (
+                f"{DOMAIN_DISPLAY_NAMES['kaggle']} / "
+                f"{DOMAIN_DISPLAY_NAMES['source']} std ratio"
+            ),
+        })
         .sort_values(
             "ks_statistic",
             ascending=False,
@@ -1910,6 +1918,14 @@ def print_numeric_summary(
         numeric[
             columns
         ]
+        .rename(columns={
+            "source_std": f"{DOMAIN_DISPLAY_NAMES['source']} std",
+            "kaggle_std": f"{DOMAIN_DISPLAY_NAMES['kaggle']} std",
+            "std_ratio_kaggle_to_source": (
+                f"{DOMAIN_DISPLAY_NAMES['kaggle']} / "
+                f"{DOMAIN_DISPLAY_NAMES['source']} std ratio"
+            ),
+        })
         .sort_values(
             "variance_distortion",
             ascending=False,
@@ -1969,6 +1985,12 @@ def print_combined_summary(
         combined[
             columns
         ]
+        .rename(columns={
+            "std_ratio_kaggle_to_source": (
+                f"{DOMAIN_DISPLAY_NAMES['kaggle']} / "
+                f"{DOMAIN_DISPLAY_NAMES['source']} std ratio"
+            ),
+        })
         .head(15)
         .to_string(
             index=False,
@@ -2164,8 +2186,8 @@ def main() -> None:
     )
 
     print(
-        "Statistics were calculated using the "
-        "complete prepared source and Kaggle datasets."
+        "Statistics were calculated using the complete prepared "
+        f"{DOMAIN_DISPLAY_NAMES['source']} and {DOMAIN_DISPLAY_NAMES['kaggle']} datasets."
     )
 
     print(
@@ -2178,7 +2200,8 @@ def main() -> None:
     )
 
     print(
-        "  With 100,000 source rows and 700,000 Kaggle rows, "
+        f"  With 100,000 {DOMAIN_DISPLAY_NAMES['source']} rows and "
+        f"700,000 {DOMAIN_DISPLAY_NAMES['kaggle']} rows, "
         "very small differences may have extremely small p-values."
     )
 

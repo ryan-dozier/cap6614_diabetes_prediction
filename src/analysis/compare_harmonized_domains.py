@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from src.domain_labels import DOMAIN_DISPLAY_NAMES
 from src.paths import (
     HARMONIZED_DOMAIN_COMPARISON_DIR as OUTPUT_DIR,
     PROCESSED_DIR,
@@ -716,22 +717,23 @@ def build_feature_compatibility(
     result = pd.DataFrame(rows)
 
     print(
-        "\nLargest Source vs NHANES differences:"
+        f"\nLargest {DOMAIN_DISPLAY_NAMES['source']} vs "
+        f"{DOMAIN_DISPLAY_NAMES['nhanes']} differences:"
     )
 
+    display_result = result[
+        ["feature", "feature_type", "metric", "source_vs_nhanes"]
+    ].rename(columns={
+        "source_vs_nhanes": (
+            f"{DOMAIN_DISPLAY_NAMES['source']} vs "
+            f"{DOMAIN_DISPLAY_NAMES['nhanes']}"
+        ),
+    })
     print(
-        result[
-            [
-                "feature",
-                "feature_type",
-                "metric",
-                "source_vs_nhanes",
-            ]
-        ]
+        display_result
         .sort_values(
-            "source_vs_nhanes",
-            key=lambda series:
-                series.abs(),
+            f"{DOMAIN_DISPLAY_NAMES['source']} vs {DOMAIN_DISPLAY_NAMES['nhanes']}",
+            key=lambda series: series.abs(),
             ascending=False,
         )
         .head(10)

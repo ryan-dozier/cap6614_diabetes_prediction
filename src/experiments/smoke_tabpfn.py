@@ -16,6 +16,7 @@ from src.experiments.results import create_run_directory, write_json, write_trai
 from src.experiments.runner import load_partition, require_disjoint, utc_now
 from src.experiments.sampling import partition_summary, sampling_metadata, select_training
 from src.models.tabpfn import TabPFNAdapter
+from src.domain_labels import display_domain_name
 
 T = TypeVar("T")
 
@@ -199,7 +200,11 @@ def main() -> None:
         except BaseException as reporting_error:
             exc.add_note(f"Could not save smoke failure report: {reporting_error}")
         raise
-    print(f"Train/val-only smoke check passed; no test partitions used. Report: {output / 'smoke.json'}")
+    print(
+        f"Train/val-only smoke check passed for "
+        f"{display_domain_name(config.train_domain, include_id=True)}; "
+        f"no test partitions used. Report: {output / 'smoke.json'}"
+    )
 
 
 if __name__ == "__main__":

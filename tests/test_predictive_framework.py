@@ -258,7 +258,12 @@ class RunnerTests(unittest.TestCase):
         return json.loads((self.config.resolved_output_dir / "metadata.json").read_text())
 
     def test_fit_once_then_three_tests_and_artifacts(self):
-        output = runner.run(self.config)
+        console = io.StringIO()
+        with contextlib.redirect_stdout(console):
+            output = runner.run(self.config)
+        self.assertIn("Original Synthetic (source)", console.getvalue())
+        self.assertIn("Playground S5E12 (kaggle)", console.getvalue())
+        self.assertIn("NHANES 2015–2016 (nhanes)", console.getvalue())
         self.assertEqual(self.events, [
             ("source", "train"), ("source", "val"), "fit",
             ("source", "test"), ("kaggle", "test"), ("nhanes", "test"),

@@ -1,3 +1,23 @@
+# Synthetic Tabular Data Under Distribution Shift
+
+This project studies how diabetes-prediction models trained on synthetic tabular data generalize across synthetic generators and to real survey data. Source and Kaggle are both synthetic; NHANES 2015–2016 provides the real-data evaluation domain. CatBoost is the reference model, and pretrained TabPFN provides the current tabular foundation-model comparison.
+
+## Current Status
+
+Status as of 2026-10-25:
+
+| Component | Status |
+|---|---|
+| Preparation, harmonization, and fixed splits | Completed |
+| Distribution-shift analysis, domain classification, and feature ablation | Completed |
+| Full-data Source and Kaggle CatBoost evaluations | Completed |
+| Matched Source n2000 CatBoost and float32 TabPFN evaluations | Completed |
+| Source and Kaggle validation-only TabPFN benchmarks | Completed; batch 1024 selected among tested settings |
+| Matched Kaggle n2000 CatBoost and float32 TabPFN evaluations | Pending |
+| TabICL and FT-Transformer | Not implemented |
+
+The next predictive comparison uses Kaggle n2000 CatBoost and Kaggle n2000 float32 TabPFN with batch size 1024. Completed Source results do not need rerunning solely for speed. Benchmark measurements are computational results, not additional predictive evaluations.
+
 ## Environment Setup
 
 This project uses a Conda environment named `synthetic-tabular-ai` with Python 3.11. The recommended setup method is to recreate the environment from the provided `environment.yml` file.
@@ -109,6 +129,48 @@ Setup complete.
 ```
 
 The setup script does **not** run the research experiments such as the domain classifier, distribution-shift analysis, or feature-ablation experiments. Those should be run separately as needed.
+
+### Acquire the Raw Data
+
+Before running setup, manually place the original, unmodified CSV files at:
+
+| Dataset | Required local file | Acquisition |
+|---|---|---|
+| Source: Diabetes Health Indicators Dataset (Mohan Krishna Thalla) | `data/raw/source/diabetes_dataset.csv` | Download and extract `diabetes_dataset.csv` from [the verified Kaggle dataset](https://www.kaggle.com/datasets/mohankrishnathalla/diabetes-health-indicators-dataset). Check the file hash below. |
+| Kaggle Playground Series S5E12 | `data/raw/kaggle_s5e12/train.csv` | Download `train.csv` from the competition's Data page, completing any required access steps. |
+
+**Verified Source provenance (2026-10-25):** the `diabetes_dataset.csv` retrieved
+from Kaggle dataset `mohankrishnathalla/diabetes-health-indicators-dataset` is
+byte-for-byte identical to the project's local Source file. Both have SHA-256:
+
+```text
+72ced87cdffdbc2dd594aa214a11c3561498200980def2958e2610413eb29bef
+```
+
+This identifies the exact 100,000-row, 31-column synthetic CSV used here. An
+explicit Kaggle version number was not captured; the hash identifies the verified
+file contents. To verify a downloaded copy from the project root on Linux/WSL:
+
+```bash
+sha256sum data/raw/source/diabetes_dataset.csv
+```
+
+“Source” is the project's domain label. Both this dataset and the competition
+training data are hosted on Kaggle; “Kaggle” in experiment configurations refers
+specifically to Playground Series S5E12. Source-to-Kaggle evaluation studies
+synthetic-to-synthetic distribution shift, while NHANES provides the real-data
+evaluation domain.
+
+The related Hugging Face `MaxPrestige/Synthetic-Diabetes-Dataset` has a different
+published schema and is not the verified file reference for this project. File
+identity with the Kaggle download does not independently establish the complete
+generation history or the relationship between all public dataset copies.
+
+Setup does not download these CSVs. Preparation records raw-file hashes in `data/processed/metadata.json`. The official Kaggle competition test file is not the project's held-out evaluation split: fixed train/validation/test partitions are created from the labeled `train.csv`.
+
+Setup downloads NHANES 2015–2016 components through `scripts/download_nhanes_2015_2016.sh`, then harmonizes them and creates fixed splits. Existing downloaded files are skipped.
+
+Source/Kaggle preparation retains their 24 shared predictors for two-domain analyses. Primary predictive experiments across all three domains use `strict_common_16`. The harmonized `common_20` and `common_22` feature sets are available for sensitivity studies; their existence does not imply those experiments are completed.
 
 ### Expected Setup Order
 
@@ -266,9 +328,11 @@ work during `predict_proba`. Fit/context-preparation time alone is not a
 cross-model training-cost comparison. No settings were selected using observed
 NHANES test scores.
 
-The TabPFN defaults for the RTX 4060 Laptop/8 GB starting point are explicit
+The original diagnostic configurations for the RTX 4060 Laptop/8 GB use explicit
 `device: "cuda:0"`, `n_estimators: 4`, `fit_mode: "fit_preprocessors"`,
 `inference_precision: "autocast"`, and `memory_saving_mode: true`.
+Upcoming n2000 research runs use explicit `float32` precision and prediction
+batch size 1024, supported by the validation benchmarks below.
 Allowed TabPFN model parameters are exactly those five plus a local `model_path`.
 The adapter controls the random state, categorical indices, and
 `ignore_pretraining_limits: false`; aliases and unsupported knobs are rejected.
@@ -284,15 +348,16 @@ scaling, or imputation. TabPFN's checkpoint-specific internal preprocessing
 (including internal scaling/transforms) is recorded in metadata. Unexpected
 missing/nonfinite canonical inputs are rejected before the package receives them.
 
-`prediction_batch_size: 256` bounds sequential query chunks, including a final
+`prediction_batch_size` bounds sequential query chunks, including a final
 partial chunk, without refitting or changing the training context. It does not
-reduce test-set size. Omitted/null batching preserves the existing unbatched
+reduce test-set size. Original configurations use 256; the explicit batch-1024
+configurations use 1024. Omitted/null batching preserves the existing unbatched
 behavior. Installed v3.5 code uses training-only scaling/ECDF statistics and
 train-key attention; fitted preprocessors transform queries rather than fitting
 on them. This is **not a claim of numerical chunking equivalence**: batch shape
 can affect kernels, precision, and memory heuristics. The optional real-model
 smoke check below measures unchunked/chunked differences on validation queries.
-No real-model chunk-equivalence result has been asserted during implementation.
+Measured agreement results for the tested float32 settings are documented below.
 
 CUDA operations are synchronized around fit/prediction timing. Metadata records
 resolved devices, ensemble count, inference/fit settings, package versions, and
@@ -320,20 +385,12 @@ adapter = TabPFNAdapter.load(
 )
 ```
 
-Run the four experiments independently from the project root. Use the float32
-TabPFN configurations for the primary comparison. The original autocast
-configurations are retained for diagnostics; the Source autocast smoke test
-exceeded the strict chunk-equivalence tolerance, while float32 passed.
-
-```bash
-python3 -m src.experiments.runner --config configs/tabpfn_source_n2000_float32.json
-python3 -m src.experiments.runner --config configs/tabpfn_kaggle_n2000_float32.json
-python3 -m src.experiments.runner --config configs/catboost_source_n2000.json
-python3 -m src.experiments.runner --config configs/catboost_kaggle_n2000.json
-```
-
-The original full-data CatBoost configurations and completed results are unchanged.
-Each new configuration has its own descriptive output directory.
+Use the explicit float32 batch-1024 configurations in the benchmark section below
+for upcoming n2000 TabPFN experiments. That section identifies the pending Kaggle
+comparison and its commands. Original batch-256 and autocast configurations are
+retained for reproducibility and diagnostics; the Source autocast smoke test
+exceeded the strict chunk-equivalence tolerance, while float32 passed. Existing
+full-data CatBoost configurations and completed results are unchanged.
 
 Optional **local real-model smoke check**, not a research experiment:
 
@@ -390,19 +447,166 @@ unchunked comparison is explicitly recorded without classifying the successful
 intended path as failed or retrying with changed settings; other failures stop
 the check and preserve available diagnostics.
 
-Separate float32 research configurations are available; the original autocast
-configurations are preserved:
-
-```bash
-python3 -m src.experiments.runner --config configs/tabpfn_source_n2000_float32.json
-python3 -m src.experiments.runner --config configs/tabpfn_kaggle_n2000_float32.json
-```
-
 The Source-trained float32 research run completed successfully, evaluating all
 three complete test splits in approximately 16 minutes. Its matched 2,000-row
 CatBoost reference also completed, with identical training identities and order.
-The Kaggle-trained float32 research run remains pending; Source feasibility
-does not establish Kaggle-context feasibility.
+The Kaggle-trained n2000 float32 research run and matched n2000 CatBoost
+baseline remain pending: available saved metadata confirms only a full-data
+Kaggle CatBoost run completed, not its n2000 baseline. The completed Source
+predictive results remain valid and do not need rerunning solely for speed.
+Use the explicit batch-1024 TabPFN configurations below for upcoming n2000
+float32 experiments; the batch-256 and autocast configurations are preserved.
+
+### Validation-only TabPFN inference benchmark
+
+`src.experiments.benchmark_tabpfn` measures prediction throughput and numerical
+agreement across batch sizes. It is **not a predictive research result**: it
+loads only configured train and same-domain validation partitions through
+`src.data`, never requests a test partition, calculates no predictive metrics,
+and does not change research configurations or their saved outputs.
+
+Completed Source and Kaggle benchmarks each used 2,000 training rows, 2,049
+same-domain validation queries, explicit float32, batches 256/512/1024, and three
+measured repetitions after one full-query warm-up per case on the RTX 4060 Laptop
+GPU. Saved reports are under
+`results/benchmarks/tabpfn_source_n2000_float32/` and
+`results/benchmarks/tabpfn_kaggle_n2000_float32/`.
+
+| Training/query domain | Batch 256 median (s) | Batch 1024 median (s) | Measured speedup |
+|---|---:|---:|---:|
+| Source | 21.8232 | 8.3923 | 2.6004x |
+| Kaggle | 17.7591 | 6.8744 | 2.5834x |
+
+Median throughput increased from 93.8909 to 244.1513 rows/s for Source and from
+115.3775 to 298.0624 rows/s for Kaggle. Batch 512 medians were 12.1719 s
+(168.3391 rows/s) and 10.6220 s (192.9017 rows/s), respectively.
+**Batch 1024 was the fastest numerically eligible tested setting in both domains.**
+All measured repetitions passed the unchanged `rtol=1e-5, atol=1e-6` criterion,
+with maximum reference probability differences of `1.1920928955078125e-7`
+(Source) and `1.4901161193847656e-7` (Kaggle), and zero threshold disagreements.
+For batch 1024, both domains recorded peak allocated memory of 2,346,739,200
+bytes and peak reserved memory of 2,982,150,144 bytes (approximately 2.78 GiB
+reserved). These are process PyTorch allocator peaks, not total GPU usage.
+
+Based on this computational evidence, use **batch 1024 for upcoming n2000
+float32 research runs**, without changing the context, seed, checkpoint,
+ensemble, precision, fit mode, threshold, or evaluation settings. These are
+inference benchmarks, **not new predictive results**. Fixed case order, laptop
+thermal/cache effects, and same-domain validation queries limit interpretation:
+neither the same speedup on complete cross-domain evaluation workloads nor
+equivalence under different settings or hardware is guaranteed.
+
+Both explicit batch-1024 research configurations are available (neither new
+research experiment has completed):
+
+```bash
+python3 -m src.experiments.runner --config configs/tabpfn_source_n2000_float32_batch1024.json
+python3 -m src.experiments.runner --config configs/tabpfn_kaggle_n2000_float32_batch1024.json
+```
+
+Each has a distinct experiment/output name ending in `_batch1024`. The Source
+command is optional; existing completed Source results need no speed-only rerun.
+The next pending matched comparison is the Kaggle batch-1024 TabPFN command
+above and its unchanged n2000 CatBoost baseline:
+
+```bash
+python3 -m src.experiments.runner --config configs/catboost_kaggle_n2000.json
+```
+
+With `synthetic-tabular-ai` activated, the completed Source benchmark was run
+from the project root as follows (use a fresh output name to repeat it):
+
+```bash
+python3 -m src.experiments.benchmark_tabpfn \
+  --config configs/tabpfn_source_n2000_float32.json \
+  --output-dir results/benchmarks/tabpfn_source_n2000_float32 \
+  --query-size 2049 \
+  --batch-sizes 256 512 1024 \
+  --repetitions 3
+```
+
+The query size, batch sizes, and repetition count shown are the defaults.
+The command requires explicit float32, an explicit CUDA device, a configured
+training sample budget and sampling seed, and batch size 256 among unique
+positive batch sizes. The local checkpoint must already be available; there
+are no downloads, CPU fallbacks, or automatic changes to model settings.
+Use a **new directory under `results/benchmarks/`** each time; existing directories
+are refused, including interrupted attempts. Research output directories are
+never reused.
+
+The context is selected with the existing deterministic training sampler.
+Validation queries are sorted by authoritative identity (`row_index` for
+Source/Kaggle, `seqn` for NHANES), then the first `query_size` rows are used.
+Selection does not use validation labels. Full train/validation identities must
+be disjoint. Training context, query order, feature order, checkpoint, model
+seed, ensemble count, precision, fit mode, and memory-saving settings are held
+fixed across cases.
+
+Batch 256 always executes first, followed by the other sizes in requested order.
+Each case creates one fresh adapter, prepares its context once, executes one
+full-query warm-up, and then performs the requested measured repetitions
+without refitting. The shared batching implementation preserves query order
+and the last partial chunk: 2,049 queries yield 8+1, 4+1, and 2+1 chunks for
+batches 256, 512, and 1024 respectively. The adapter is released and unused CUDA
+allocations are cleared between cases, not between measured repetitions.
+
+Prediction timing uses a monotonic timer with CUDA synchronization before and
+after prediction and peak counters reset before each repetition. It excludes
+loading, construction/checkpoint hashing, context preparation, warm-up,
+serialization, comparisons, and console output. Context preparation and
+warm-up have separate timings. Memory peaks describe the **process's PyTorch
+allocator, not total GPU usage**. Fixed case order, cache state, and laptop
+thermals may affect timings; small timing differences are not statistically
+established speedups.
+
+Every measured vector is checked for exact row count, one dimension, finite
+values, and probabilities in `[0, 1]`. The first measured batch-256 vector is
+the fixed reference for **all** measured repetitions, including later
+batch-256 repetitions. Reports include maximum/mean absolute differences,
+`np.allclose(rtol=1e-5, atol=1e-6)`, and threshold disagreements using
+`probability >= config.threshold`. Probabilities are not rounded. Matching
+classifications alone do not establish probability equivalence; the tolerance
+cannot be relaxed through CLI options.
+
+Outputs, saved incrementally with atomic JSON/CSV replacement:
+
+- `benchmark.json`: UTC timestamps, arguments, resolved configuration,
+  package/device/checkpoint metadata, sampling/query fingerprints, feature
+  order, operation failures, measurements, agreement and eligibility.
+- `benchmark_summary.csv`: one row per requested size, including failed or
+  unattempted cases; context/warm-up times, median throughput/duration,
+  minimum/maximum duration, maximum measured allocator peaks, and speedup
+  relative to batch 256's median duration.
+- `benchmark_repetitions.csv`: one row per attempted measured repetition,
+  with its status, available timing/memory, agreement, and probability path.
+- `training_sample.csv.gz` and `validation_queries.csv.gz`: selected row
+  provenance. Query provenance contains identifiers and query order, not
+  features or labels.
+- `probabilities_batch<SIZE>_repetition<N>.npy`: each measured probability
+  vector, saved without pickle; load with `np.load(path, allow_pickle=False)`.
+
+Only a case with all requested measured repetitions completed and passing
+agreement is numerically eligible. The report identifies the fastest eligible
+measured case, but never rewrites a research config or launches an experiment.
+OOM reports identify the operation, batch size, repetition (if applicable),
+and error, preserving completed measurements without altered-setting retries.
+Reference OOM or disagreement stops the benchmark. Candidate OOM may continue
+after successful cleanup; candidate disagreement retains its measurements,
+excludes the case, and continues. Unexpected errors and KeyboardInterrupt
+preserve available diagnostics and propagate; reporting/cleanup failures do
+not replace the original error.
+
+Top-level statuses and exit behavior:
+
+- `running`: in progress, or the process ended before final diagnostics.
+- `completed`: every requested case completed and passed; exit 0.
+- `completed_with_issues`: reference passed but a candidate had OOM or failed
+  agreement; **exit 1**, even if another candidate passed.
+- `failed`: reference or unexpected execution failure; nonzero exit.
+
+Per-case execution status and numerical eligibility are recorded separately,
+with case statuses `completed`, `out_of_memory`, `agreement_failed`, `failed`,
+or `not_run` (and `running` while active).
 
 ### `scripts/diagnostics/inspect_datasets.py`
 

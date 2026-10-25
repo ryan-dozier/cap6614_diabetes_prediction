@@ -1,0 +1,22 @@
+{
+  "experiment_name": "tabpfn_v35_source_strict_common_16_n2000_float32_seed42_batch1024",
+  "model": "tabpfn",
+  "train_domain": "source",
+  "validation_domain": "source",
+  "test_domains": ["source", "kaggle", "nhanes"],
+  "feature_set": "strict_common_16",
+  "seed": 42,
+  "threshold": 0.5,
+  "calibration_bins": 10,
+  "train_sample_size": 2000,
+  "sampling_seed": 42,
+  "prediction_batch_size": 1024,
+  "model_params": {
+    "n_estimators": 4,
+    "device": "cuda:0",
+    "fit_mode": "fit_preprocessors",
+    "inference_precision": "float32",
+    "memory_saving_mode": true
+  },
+  "output_dir": "results/predictive/tabpfn_v35_source_strict_common_16_n2000_float32_seed42_batch1024"
+}

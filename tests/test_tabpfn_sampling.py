@@ -99,6 +99,12 @@ class SamplingTests(unittest.TestCase):
 
 class ExtendedConfigTests(unittest.TestCase):
     def test_float32_research_configs_only_change_precision_and_run_identity(self):
+        existing_outputs = {
+            load_config(path).resolved_output_dir
+            for path in CONFIGS_DIR.glob("*.json")
+            if not path.stem.endswith("_batch1024")
+        }
+        batch_outputs = set()
         for domain in ("source", "kaggle"):
             original = load_config(CONFIGS_DIR / f"tabpfn_{domain}_n2000.json")
             new = load_config(CONFIGS_DIR / f"tabpfn_{domain}_n2000_float32.json")
@@ -112,6 +118,21 @@ class ExtendedConfigTests(unittest.TestCase):
                 new_values.pop(key)
             new_values["model_params"]["inference_precision"] = "autocast"
             self.assertEqual(old_values, new_values)
+
+            batched = load_config(CONFIGS_DIR / f"tabpfn_{domain}_n2000_float32_batch1024.json")
+            self.assertEqual(new.prediction_batch_size, 256)
+            self.assertEqual(batched.prediction_batch_size, 1024)
+            self.assertEqual(batched.experiment_name, new.experiment_name + "_batch1024")
+            self.assertEqual(str(batched.resolved_output_dir), str(new.resolved_output_dir) + "_batch1024")
+            self.assertNotIn(batched.resolved_output_dir, existing_outputs | batch_outputs)
+            batch_outputs.add(batched.resolved_output_dir)
+            expected = new.to_dict()
+            expected.update(
+                prediction_batch_size=1024,
+                experiment_name=new.experiment_name + "_batch1024",
+                output_dir=str(new.resolved_output_dir) + "_batch1024",
+            )
+            self.assertEqual(batched.to_dict(), expected)
 
     def test_original_configs_and_four_new_configs(self):
         for name in ("catboost_source.json", "catboost_kaggle.json"):

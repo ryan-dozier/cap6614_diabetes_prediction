@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Iterable
 
 import numpy as np
 import pandas as pd
@@ -20,21 +20,27 @@ class Partition:
     summary: dict[str, Any]
 
 
+def identity_fingerprints(domain: str, identity_column: str, values: Iterable[int]) -> dict[str, str]:
+    identity_lines = [
+        f"{domain}\t{identity_column}\t{int(value)}\n"
+        for value in values
+    ]
+    return {
+        "identity_sha256": hashlib.sha256("".join(sorted(identity_lines)).encode()).hexdigest(),
+        "ordered_identity_sha256": hashlib.sha256("".join(identity_lines).encode()).hexdigest(),
+    }
+
+
 def partition_summary(
     domain: str, split: str, provenance: pd.DataFrame, y: pd.Series,
 ) -> dict[str, Any]:
     identity_column = "seqn" if domain == "nhanes" else "row_index"
     labels = binary_labels(y)
-    identity_lines = [
-        f"{domain}\t{identity_column}\t{int(value)}\n"
-        for value in provenance[identity_column]
-    ]
     return {
         "domain": domain, "split": split, "rows": len(labels),
         "class_counts": {"0": int((labels == 0).sum()), "1": int((labels == 1).sum())},
         "identity_column": identity_column,
-        "identity_sha256": hashlib.sha256("".join(sorted(identity_lines)).encode()).hexdigest(),
-        "ordered_identity_sha256": hashlib.sha256("".join(identity_lines).encode()).hexdigest(),
+        **identity_fingerprints(domain, identity_column, provenance[identity_column]),
     }
 
 

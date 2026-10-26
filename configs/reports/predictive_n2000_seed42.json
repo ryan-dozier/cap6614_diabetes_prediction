@@ -1,0 +1,86 @@
+{
+  "report_schema_version": 1,
+  "comparison": {
+    "models": [
+      "catboost",
+      "tabpfn"
+    ],
+    "training_domains": [
+      "source",
+      "kaggle"
+    ],
+    "evaluation_domains": [
+      "source",
+      "kaggle",
+      "nhanes"
+    ],
+    "feature_set": "strict_common_16",
+    "feature_order": [
+      "age",
+      "alcohol_consumption_per_week",
+      "bmi",
+      "cardiovascular_history",
+      "cholesterol_total",
+      "diastolic_bp",
+      "ethnicity",
+      "family_history_diabetes",
+      "gender",
+      "hdl_cholesterol",
+      "heart_rate",
+      "hypertension_history",
+      "physical_activity_minutes_per_week",
+      "sleep_hours_per_day",
+      "smoking_status",
+      "systolic_bp"
+    ],
+    "target": "diagnosed_diabetes",
+    "training_budget": 2000,
+    "model_seed": 42,
+    "sampling_seed": 42,
+    "threshold": 0.5
+  },
+  "runs": [
+    {
+      "role": "source_catboost",
+      "run_id": "catboost_source_strict_common_16_n2000_seed42",
+      "artifact_dir": "results/predictive/catboost_source_strict_common_16_n2000_seed42",
+      "model": "catboost",
+      "train_domain": "source",
+      "prediction_batch_size": 256,
+      "expected_device": "CPU"
+    },
+    {
+      "role": "source_tabpfn",
+      "run_id": "tabpfn_v35_source_strict_common_16_n2000_float32_seed42",
+      "artifact_dir": "results/predictive/tabpfn_v35_source_strict_common_16_n2000_float32_seed42",
+      "model": "tabpfn",
+      "train_domain": "source",
+      "prediction_batch_size": 256,
+      "expected_device": "cuda"
+    },
+    {
+      "role": "kaggle_catboost",
+      "run_id": "catboost_kaggle_strict_common_16_n2000_seed42",
+      "artifact_dir": "results/predictive/catboost_kaggle_strict_common_16_n2000_seed42",
+      "model": "catboost",
+      "train_domain": "kaggle",
+      "prediction_batch_size": 256,
+      "expected_device": "CPU"
+    },
+    {
+      "role": "kaggle_tabpfn",
+      "run_id": "tabpfn_v35_kaggle_strict_common_16_n2000_float32_seed42_batch1024",
+      "artifact_dir": "results/predictive/tabpfn_v35_kaggle_strict_common_16_n2000_float32_seed42_batch1024",
+      "model": "tabpfn",
+      "train_domain": "kaggle",
+      "prediction_batch_size": 1024,
+      "expected_device": "cuda"
+    }
+  ],
+  "expected_methodological_differences": [
+    "CatBoost uses same-domain validation for early stopping; TabPFN does not use validation or early stopping.",
+    "CatBoost runs on CPU; TabPFN runs on GPU for the recorded experiments.",
+    "Original Synthetic TabPFN uses prediction batch size 256; Playground S5E12 TabPFN uses prediction batch size 1024.",
+    "Model parameters and model artifacts naturally differ between CatBoost and TabPFN and are not treated as matching inputs."
+  ]
+}

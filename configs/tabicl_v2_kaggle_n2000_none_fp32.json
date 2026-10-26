@@ -1,0 +1,28 @@
+{
+  "experiment_name": "tabicl_v2_kaggle_strict_common_16_n2000_none_fp32_uncached_seed42",
+  "model": "tabicl",
+  "train_domain": "kaggle",
+  "validation_domain": "kaggle",
+  "test_domains": ["source", "kaggle", "nhanes"],
+  "feature_set": "strict_common_16",
+  "seed": 42,
+  "sampling_seed": 42,
+  "threshold": 0.5,
+  "calibration_bins": 10,
+  "train_sample_size": 2000,
+  "prediction_batch_size": 128,
+  "early_stopping_rounds": null,
+  "model_params": {
+    "model_path": "checkpoints/tabicl/4dcd344ece2c00be9e831fdd35bed57b5ad83e19/tabicl-classifier-v2-20260212.ckpt",
+    "norm_methods": ["none"],
+    "device": "cuda:0",
+    "n_estimators": 8,
+    "batch_size": 1,
+    "use_amp": false,
+    "use_fa3": false,
+    "kv_cache": false,
+    "offload_mode": "cpu",
+    "n_jobs": 4
+  },
+  "output_dir": "results/predictive/tabicl_v2_kaggle_strict_common_16_n2000_none_fp32_uncached_seed42"
+}

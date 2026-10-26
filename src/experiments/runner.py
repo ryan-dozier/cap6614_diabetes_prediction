@@ -95,7 +95,11 @@ def prepared_fingerprints(config: ExperimentConfig) -> dict[str, str]:
 
 def environment_metadata(model: str = "catboost") -> dict[str, Any]:
     packages = {}
-    model_packages = ("tabpfn", "torch") if model == "tabpfn" else ("catboost",)
+    model_packages = {
+        "tabpfn": ("tabpfn", "torch"),
+        "tabicl": ("tabicl", "torch", "huggingface-hub", "einops", "psutil"),
+        "catboost": ("catboost",),
+    }[model]
     for package in ("numpy", "pandas", "scikit-learn", "scipy", *model_packages):
         try:
             packages[package] = version(package)
@@ -111,7 +115,7 @@ def environment_metadata(model: str = "catboost") -> dict[str, Any]:
 
 
 def selection_policy(model: str) -> str:
-    if model == "tabpfn":
+    if model in ("tabpfn", "tabicl"):
         return (
             "One pretrained predictor prepared with training context only; validation unused. "
             "No early stopping, validation-based selection, calibration or target-domain adaptation. "
@@ -124,6 +128,13 @@ def selection_policy(model: str) -> str:
 
 
 def create_adapter(config: ExperimentConfig, schema: DatasetSchema) -> ModelAdapter:
+    if config.model == "tabicl":
+        from src.models.tabicl import TabICLAdapter
+
+        return TabICLAdapter(
+            schema.features, schema.categorical_features, schema.target,
+            seed=config.seed, model_params=config.model_params,
+        )
     if config.model == "tabpfn":
         from src.models.tabpfn import TabPFNAdapter
 
@@ -197,6 +208,12 @@ def run(config: ExperimentConfig) -> Path:
         write_json(output / "metadata.json", metadata)
 
         adapter = create_adapter(config, schema)
+        if config.model == "tabicl":
+            from src.models.tabicl import TabICLAdapter
+
+            if not isinstance(adapter, TabICLAdapter):
+                raise TypeError("TabICL factory must return a TabICLAdapter.")
+            adapter.set_diagnostic_path(output / "native_diagnostics.log")
         metadata["model_artifact"] = adapter.artifact_name
         adapter.reset_peak_memory()
         adapter.synchronize()
@@ -237,6 +254,8 @@ def run(config: ExperimentConfig) -> Path:
             evaluations[domain] = evaluation
             write_evaluations(output, evaluations)
             metadata["resources"] = adapter.resource_metadata()
+            if config.model == "tabicl":
+                metadata["model"] = adapter.metadata()
             write_json(output / "metadata.json", metadata)
 
         domain_width = max(
@@ -262,17 +281,31 @@ def run(config: ExperimentConfig) -> Path:
             total_duration_seconds=time.perf_counter() - started,
             error={"type": type(exc).__name__, "message": str(exc)},
         )
-        if config.model == "tabpfn" and "out of memory" in str(exc).lower():
+        if config.model == "tabicl" and "adapter" in locals():
+            try:
+                metadata["resources"] = adapter.resource_metadata()
+            except Exception as resource_error:
+                LOGGER.exception("Could not collect TabICL failure resources; preserving original error.")
+                exc.add_note(f"Could not collect failure resources: {resource_error}")
+        if config.model in ("tabpfn", "tabicl") and "out of memory" in str(exc).lower():
             context = {
                 "train_sample_size": config.train_sample_size,
                 "prediction_batch_size": config.prediction_batch_size,
-                "n_estimators": config.model_params.get("n_estimators", 4),
+                "n_estimators": config.model_params.get("n_estimators", 8 if config.model == "tabicl" else 4),
                 "device": config.model_params.get("device", "cuda:0"),
-                "recovery": "Use a NEW output directory and explicitly configure a smaller context/batch/ensemble; no automatic retry or fallback.",
+                **({"ensemble_batch_size": config.model_params.get("batch_size", 1)}
+                   if config.model == "tabicl" else {}),
+                "recovery": (
+                    "No project-level retry/fallback; native scheduling/recovery may already have occurred. "
+                    "Inspect native_diagnostics.log and review any changed profile in a NEW output directory. "
+                    "Do not reduce the n2000 context while claiming matched-budget feasibility."
+                    if config.model == "tabicl" else
+                    "Use a NEW output directory and explicitly configure a smaller context/batch/ensemble; no automatic retry or fallback."
+                ),
             }
             metadata["error"]["out_of_memory_context"] = context
-            LOGGER.error("TabPFN out of memory: %s", context)
-            exc.add_note(f"TabPFN configured memory context: {context}")
+            LOGGER.error("%s out of memory: %s", config.model, context)
+            exc.add_note(f"{config.model} configured memory context: {context}")
         try:
             write_json(output / "metadata.json", metadata)
         except BaseException:

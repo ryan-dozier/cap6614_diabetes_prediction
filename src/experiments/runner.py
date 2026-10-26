@@ -214,6 +214,9 @@ def run(config: ExperimentConfig) -> Path:
             if not isinstance(adapter, TabICLAdapter):
                 raise TypeError("TabICL factory must return a TabICLAdapter.")
             adapter.set_diagnostic_path(output / "native_diagnostics.log")
+            print(f"TabICL run: {config.experiment_name}", flush=True)
+            print(f"Native diagnostics: {output / 'native_diagnostics.log'}", flush=True)
+            print(f"Preparing {len(selected.X):,} training context rows...", flush=True)
         metadata["model_artifact"] = adapter.artifact_name
         adapter.reset_peak_memory()
         adapter.synchronize()
@@ -221,6 +224,8 @@ def run(config: ExperimentConfig) -> Path:
         adapter.fit(selected.X, selected.y, val.X, val.y)
         adapter.synchronize()
         metadata["fit_duration_seconds"] = time.perf_counter() - fit_started
+        if config.model == "tabicl":
+            print(f"Context prepared in {metadata['fit_duration_seconds']:.2f}s; saving fitted state...", flush=True)
         adapter.save(output / adapter.artifact_name)
         metadata["model"] = adapter.metadata()
         metadata["preprocessing"] = metadata["model"]["preprocessing"]
@@ -233,6 +238,8 @@ def run(config: ExperimentConfig) -> Path:
             require_disjoint(train, test)
             require_disjoint(val, test)
             metadata["splits"][f"{domain}/test"] = test.summary
+            if config.model == "tabicl":
+                print(f"Predicting {display_domain_name(domain)}: {len(test.X):,} rows...", flush=True)
             adapter.synchronize()
             predict_started = time.perf_counter()
             probability = (
@@ -241,6 +248,8 @@ def run(config: ExperimentConfig) -> Path:
             )
             adapter.synchronize()
             metadata["prediction_duration_seconds"][domain] = time.perf_counter() - predict_started
+            if config.model == "tabicl":
+                print(f"Prediction completed in {metadata['prediction_duration_seconds'][domain]:.2f}s; writing results...", flush=True)
             evaluation = evaluate_binary(test.y, probability, config.threshold, config.calibration_bins)
             for warning in evaluation["warnings"]:
                 LOGGER.warning("%s/test: %s", display_domain_name(domain, include_id=True), warning)

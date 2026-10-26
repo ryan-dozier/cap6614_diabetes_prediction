@@ -11,7 +11,7 @@ from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from copy import deepcopy
 from importlib.metadata import version
 from pathlib import Path
-from typing import Any, Generator, TextIO
+from typing import Any, Generator
 
 import numpy as np
 import pandas as pd
@@ -90,19 +90,6 @@ def _json_value(value: Any) -> Any:
     if torch is not None and isinstance(value, (torch.device, torch.dtype)):
         return str(value)
     raise TypeError(f"Unsupported TabICL metadata value: {type(value).__name__}")
-
-
-class _Tee(io.TextIOBase):
-    def __init__(self, original: TextIO, capture: io.StringIO) -> None:
-        self.original, self.capture = original, capture
-
-    def write(self, text: str) -> int:
-        self.capture.write(text)
-        self.original.write(text)
-        return len(text)
-
-    def flush(self) -> None:
-        self.original.flush()
 
 
 class TabICLAdapter(ModelAdapter):
@@ -188,7 +175,7 @@ class TabICLAdapter(ModelAdapter):
         try:
             with warnings.catch_warnings(record=True) as caught:
                 warnings.simplefilter("always")
-                with redirect_stdout(_Tee(sys.stdout, capture)), redirect_stderr(_Tee(sys.stderr, capture)):
+                with redirect_stdout(capture), redirect_stderr(capture):
                     yield
         finally:
             original = sys.exception()
@@ -206,8 +193,9 @@ class TabICLAdapter(ModelAdapter):
                     "recovery_detected": recovery, "swap_fallback_detected": swap,
                 })
                 entry = f"\n--- {operation} ---\n{text}"
-                self._diagnostic_text.append(entry)
-                if self._diagnostic_path is not None:
+                if self._diagnostic_path is None:
+                    self._diagnostic_text.append(entry)
+                else:
                     with self._diagnostic_path.open("a", encoding="utf-8") as handle:
                         handle.write(entry)
                 if recovery or swap:
@@ -228,7 +216,8 @@ class TabICLAdapter(ModelAdapter):
             ),
             "swap_fallback_detected": any(row["swap_fallback_detected"] for row in self._diagnostic_records),
             "limitations": (
-                "Captured Python stdout/stderr and warnings, not a complete scheduling trace. "
+                "Native stdout/stderr go to the diagnostic log, not the console; warnings remain visible. "
+                "Captured output is not a complete scheduling trace. "
                 "No recovery detected is not proof of unchanged internal scheduling. "
                 "Native memory estimates and storage-tier choices may vary between calls."
             ),

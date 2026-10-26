@@ -1,6 +1,6 @@
 # Synthetic Tabular Data Under Distribution Shift
 
-This project studies how diabetes-prediction models trained on synthetic tabular data generalize across synthetic generators and to real survey data. **Original Synthetic: the 100,000-row Diabetes Health Indicators Dataset published on Kaggle by Mohan Krishna Thalla.** This is a descriptive project label, not an independently verified claim about original authorship or the complete generation history. Original Synthetic and Playground S5E12 are both synthetic; NHANES 2015–2016 is real survey data. CatBoost is the reference model. Pretrained TabPFN provides completed foundation-model comparisons; TabICLv2 is integrated and locally validated, with its full predictive comparisons pending (M08).
+This project studies how diabetes-prediction models trained on synthetic tabular data generalize across synthetic generators and to real survey data. **Original Synthetic: the 100,000-row Diabetes Health Indicators Dataset published on Kaggle by Mohan Krishna Thalla.** This is a descriptive project label, not an independently verified claim about original authorship or the complete generation history. Original Synthetic and Playground S5E12 are both synthetic; NHANES 2015–2016 is real survey data. CatBoost is the reference model. Pretrained TabPFN provides completed foundation-model comparisons; TabICLv2 is integrated and locally validated, with both initial n2000 predictive comparisons complete (M08).
 
 | Internal ID | Display name | Dataset |
 |---|---|---|
@@ -14,7 +14,7 @@ See [the project checklist and contribution record](PROJECT_CHECKLIST.md) for ch
 
 ## Current Status
 
-Status as of 2026-10-25:
+Status as of 2026-10-26:
 
 | Component | Status |
 |---|---|
@@ -25,7 +25,7 @@ Status as of 2026-10-25:
 | Original Synthetic and Playground S5E12 validation-only TabPFN benchmarks | Completed; batch 1024 selected among tested settings |
 | Matched Playground S5E12 n2000 CatBoost and float32 TabPFN batch-1024 evaluations | Completed |
 | Predictive comparison reporting | Completed for four matched CatBoost/TabPFN runs: validated tables and performance, calibration, and runtime figures |
-| TabICL | Adapter and bounded none/FP32 local checks complete for both n2000 contexts; full predictive runs pending (M08) |
+| TabICL | Adapter, local checks, and both matched n2000 none/FP32 predictive runs complete (M07/M08); reporting integration pending (E04) |
 | FT-Transformer | Not implemented |
 
 Matched n2000 CatBoost and float32 TabPFN results for both synthetic domains are complete. The Playground S5E12 results are in `results/predictive/catboost_kaggle_strict_common_16_n2000_seed42/` and `results/predictive/tabpfn_v35_kaggle_strict_common_16_n2000_float32_seed42_batch1024/`. The Original Synthetic batch-256 predictive results are complete and remain valid; rerunning them at batch 1024 is optional and only for a runtime comparison. Benchmark measurements are computational results, not additional predictive evaluations.
@@ -234,7 +234,7 @@ synthetic-to-real shift to NHANES 2015–2016.
 CatBoost is the reference adapter. Local pretrained TabPFN classification is also
 supported for completed research runs. TabICL's explicit none/FP32 profile passed
 bounded train/validation-only local checks for both frozen n2000 contexts
-(see below); its full predictive runs remain pending (M08).
+(see below); both initial n2000 predictive runs are complete (M08).
 FT-Transformer is not implemented.
 
 The first configuration fits **one** CatBoost model with seed 42 on Original
@@ -552,8 +552,9 @@ The adapter, configuration/factory/environment hooks, native persistence,
 tests and train/validation-only smoke command are implemented. Both frozen
 n2000 contexts passed local correctness, persistence and resource gates;
 see [stage-3 results](docs/tabicl_stage3_results.md) for the four-run evidence
-and scope. **Full TabICL predictive runs remain pending (M08)**, not implied
-by local feasibility or configuration validation.
+and scope. **Both initial TabICL predictive runs are complete (M08)**; see the
+[predictive results review](docs/tabicl_predictive_results.md). Their completion
+is established by saved predictive artifacts, separately from local smoke checks.
 
 The runtime requires exactly `tabicl==2.2.0`, pinned in both dependency files.
 No PyTorch/CUDA replacement or other package upgrade was needed. The default
@@ -610,7 +611,11 @@ query batch 128, AMP/FA3/cache disabled, CUDA device 0, and requested CPU
 column-output storage. Native resource managers still choose internal splits
 and may recover from OOM or change output placement. Captured Python
 stdout/stderr/warnings are saved in `native_diagnostics.log` (and a separate
-reload log). **`no_recovery_detected` is not proof that no scheduling changes
+reload log). Routine native output is captured without console echo; Python
+warnings and detected recovery/swap warnings remain visible. The research runner
+prints flushed run/context/domain progress messages and final metrics, suitable
+for cluster job logs. Detailed diagnostics remain enabled internally.
+**`no_recovery_detected` is not proof that no scheduling changes
 occurred.** Complete native scheduling is not exposed by a stable public API.
 The adapter restores the previous torch thread count even if prediction fails;
 do not run these adapters concurrently in one process.
@@ -686,7 +691,7 @@ leaving the original checkpoint untouched. All four real-model reloads passed
 offline with exactly matching probabilities on the same saved CUDA device and
 dependency versions.
 
-#### Verified local evidence and pending M08 runs
+#### Verified local evidence and completed M08 runs
 
 All four sequential checks (Original Synthetic and Playground S5E12, n512 and
 n2000) passed numerical and reload gates. Both n2000 selections matched the
@@ -717,7 +722,11 @@ validation (unused by the adapter). Output names include generation, domain,
 budget, none/FP32/uncached profile and seed, distinct from smoke/existing runs.
 Equal ensemble counts across model families do not imply equal compute.
 
-**M08 only: pending full predictive runs, not executed as part of M07.**
+**M08: both full predictive runs below completed after M07.**
+See [the result comparison and runtime review](docs/tabicl_predictive_results.md).
+Existing output directories are protected; repeating these runs requires new
+experiment/output names. The current reporting manifest still selects only
+CatBoost/TabPFN; TabICL report integration is tracked as E04.
 Each command evaluates all three full test domains: Original Synthetic,
 Playground S5E12 and NHANES 2015–2016. Do not substitute these commands for
 validation-only smoke checks:

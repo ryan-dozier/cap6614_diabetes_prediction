@@ -268,6 +268,61 @@ Choose a new `output_dir` in the JSON configuration for every rerun. Outputs:
   authoritative identifiers, and zero-based `sample_order` (also emitted for
   full-data runs).
 
+#### Fixed-seed predictive comparison report
+
+The first artifact-based comparison report uses the explicit, versioned
+selection in `configs/reports/predictive_n2000_seed42.json`. It validates the
+four matched n=2,000 CatBoost/TabPFN runs, their saved identities, labels,
+fingerprints, metrics, calibration bins, and evaluation populations across all
+four runs, then writes CSV and Markdown tables. `validation.json` distinguishes
+input-validation from report-generation status; `manifest.json` records consumed
+artifact hashes, reporting package versions, and available Git revision/dirty
+state. It reads saved artifacts only: it does not train, load checkpoints, or
+run inference. Bootstrap intervals, multi-seed aggregation, and full-data
+reference comparisons are not implemented.
+
+From the project root, choose a fresh output directory for each invocation.
+The default is tables-only and does not import Matplotlib:
+
+```bash
+python3 -m src.reporting.compare_predictive \
+  --manifest configs/reports/predictive_n2000_seed42.json \
+  --output-dir results/reports/predictive_n2000_seed42_tables
+```
+
+Add `--with-figures` to generate descriptive performance, reliability/bin
+support, and prediction-runtime charts, each as PNG and PDF:
+
+```bash
+python3 -m src.reporting.compare_predictive \
+  --manifest configs/reports/predictive_n2000_seed42.json \
+  --output-dir results/reports/predictive_n2000_seed42_figures \
+  --with-figures
+```
+
+The manifest explicitly selects every run; runs are never discovered or chosen
+by recency or score. Reports contain `metrics.csv`,
+`metric_differences.csv`, `runtime.csv`, and `calibration_bins.csv`, plus
+`report.md`, `manifest.json`, and `validation.json`. Figure-enabled reports
+include a `figures/` directory with metric, reliability, bin-support, and
+runtime plots. The report manifest records figure selection, generated
+filenames, Matplotlib version when applicable, consumed artifact hashes,
+reporting package versions, and available Git provenance.
+
+Output paths resolve from the project root and must be new directories under
+`results/reports/`. Existing output paths and paths overlapping input runs are
+refused. Input validation and report-generation completion are recorded
+separately; failures during validation, plotting, or writing leave a failed
+diagnostic and are never reported as completed.
+
+Figures are descriptive: these are single-seed fixed-split observations, not
+uncertainty estimates or significance claims. Equal training-row budgets do
+not equalize external pretraining, validation access, hardware, or compute.
+Average precision and Brier scores depend on the evaluation population and
+prevalence; NHANES results describe the held-out sample and protocol, not
+national-population estimates. No model selection, threshold tuning, or
+calibration fitting is performed.
+
 Identifiers never enter predictors. Native categorical handling converts
 categorical columns to strings on copies; there is no scaling, one-hot encoding,
 external target encoding, or imputation. Missing/nonfinite inputs are rejected.

@@ -16,6 +16,7 @@ from src.paths import PROJECT_ROOT, RESULTS_DIR
 
 METRIC_TOLERANCE = 1e-8
 IDENTITY_COLUMNS = {"source": "row_index", "kaggle": "row_index", "nhanes": "seqn"}
+CATEGORICAL_FEATURES = ["ethnicity", "gender", "smoking_status"]
 METRICS = ("roc_auc", "average_precision", "f1", "brier_score")
 ARTIFACTS = (
     "config.json",
@@ -171,7 +172,7 @@ def _summary(domain: str, split: str, identities: list[int], labels: list[int]) 
     }
 
 
-def _check_manifest(manifest: Any) -> list[dict[str, Any]]:
+def _check_manifest_v1(manifest: Any) -> list[dict[str, Any]]:
     if not isinstance(manifest, dict):
         raise ReportValidationError("manifest.json must contain a JSON object")
     if manifest.get("report_schema_version") != 1:
@@ -257,6 +258,223 @@ def _check_manifest(manifest: Any) -> list[dict[str, Any]]:
     return runs
 
 
+def _check_manifest_v2(manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    if type(manifest.get("output_schema_version")) is not int or manifest["output_schema_version"] != 2:
+        raise ReportValidationError("manifest.json field output_schema_version must be 2 for report schema 2")
+    comparison = manifest.get("comparison")
+    if not isinstance(comparison, dict):
+        raise ReportValidationError("manifest.json field comparison must be an object")
+    expected_comparison = {
+        "models": ["catboost", "tabpfn", "tabicl"],
+        "training_domains": ["source", "kaggle"],
+        "evaluation_domains": ["source", "kaggle", "nhanes"],
+        "feature_set": "strict_common_16",
+        "target": "diagnosed_diabetes",
+        "training_budget": 2000,
+        "model_seed": 42,
+        "sampling_seed": 42,
+        "threshold": 0.5,
+    }
+    for key, expected in expected_comparison.items():
+        actual = comparison.get(key)
+        if type(actual) is not type(expected) or actual != expected:
+            raise ReportValidationError(f"manifest.json field comparison.{key} must be {expected!r}")
+    feature_order = comparison.get("feature_order")
+    if (
+        not isinstance(feature_order, list)
+        or len(feature_order) != 16
+        or not all(isinstance(feature, str) and feature for feature in feature_order)
+        or len(set(feature_order)) != 16
+    ):
+        raise ReportValidationError(
+            "manifest.json field comparison.feature_order must contain 16 unique feature names"
+        )
+    if comparison.get("categorical_features") != CATEGORICAL_FEATURES:
+        raise ReportValidationError(
+            f"manifest.json field comparison.categorical_features must be {CATEGORICAL_FEATURES!r}"
+        )
+
+    profiles = manifest.get("model_profiles")
+    if not isinstance(profiles, dict) or set(profiles) != set(expected_comparison["models"]):
+        raise ReportValidationError("manifest.json field model_profiles must define all three models")
+    expected_profiles = {
+        "catboost": {
+            "generation": "CatBoost CPU",
+            "validation_policy": "same_domain_early_stopping",
+            "device": "CPU",
+            "prediction_batch_size": 256,
+        },
+        "tabpfn": {
+            "generation": "TabPFN v3.5 (20260909)",
+            "validation_policy": "training_context_only",
+            "device": "cuda",
+            "inference_precision": "float32",
+            "n_estimators": 4,
+        },
+        "tabicl": {
+            "generation": "TabICLv2 classifier",
+            "checkpoint_revision": "4dcd344ece2c00be9e831fdd35bed57b5ad83e19",
+            "checkpoint_filename": "tabicl-classifier-v2-20260212.ckpt",
+            "package_version": "2.2.0",
+            "profile_id": "tabicl_v2_none_fp32_uncached",
+            "validation_policy": "training_context_only",
+            "device": "cuda",
+            "precision": "FP32",
+            "normalization": ["none"],
+            "n_estimators": 8,
+            "native_ensemble_batch_size": 1,
+            "column_output_storage": "cpu",
+            "kv_cache": False,
+            "use_amp": False,
+            "use_fa3": False,
+        },
+    }
+    for model, required in expected_profiles.items():
+        actual = profiles[model]
+        if not isinstance(actual, dict):
+            raise ReportValidationError(f"manifest.json field model_profiles.{model} must be an object")
+        for key, expected in required.items():
+            value = actual.get(key)
+            if type(value) is not type(expected) or value != expected:
+                raise ReportValidationError(
+                    f"manifest.json field model_profiles.{model}.{key} must be {expected!r}"
+                )
+
+    runs = manifest.get("runs")
+    if not isinstance(runs, list) or len(runs) != 6:
+        raise ReportValidationError("manifest.json field runs must contain exactly six explicit run entries")
+    required_roles = {
+        f"{domain}_{model}"
+        for domain in expected_comparison["training_domains"]
+        for model in expected_comparison["models"]
+    }
+    seen_roles: set[str] = set()
+    seen_ids: set[str] = set()
+    seen_paths: set[str] = set()
+    expected_batches = {
+        ("source", "catboost"): 256,
+        ("source", "tabpfn"): 256,
+        ("source", "tabicl"): 128,
+        ("kaggle", "catboost"): 256,
+        ("kaggle", "tabpfn"): 1024,
+        ("kaggle", "tabicl"): 128,
+    }
+    for index, spec in enumerate(runs):
+        if not isinstance(spec, dict):
+            raise ReportValidationError(f"manifest.json field runs[{index}] must be an object")
+        for key in ("role", "run_id", "artifact_dir", "model", "train_domain",
+                    "prediction_batch_size", "expected_device"):
+            if key not in spec:
+                raise ReportValidationError(f"manifest.json field runs[{index}].{key} is required")
+        if not all(
+            isinstance(spec[key], str) and spec[key]
+            for key in ("role", "run_id", "artifact_dir", "model", "train_domain", "expected_device")
+        ):
+            raise ReportValidationError(f"manifest.json runs[{index}] identifiers and path must be nonempty strings")
+        role = spec["role"]
+        if role in seen_roles:
+            raise ReportValidationError(f"manifest.json has duplicate comparison role {role!r}")
+        if spec["run_id"] in seen_ids:
+            raise ReportValidationError(f"manifest.json has duplicate run_id {spec['run_id']!r}")
+        if spec["artifact_dir"] in seen_paths:
+            raise ReportValidationError(f"manifest.json has duplicate artifact_dir {spec['artifact_dir']!r}")
+        seen_roles.add(role)
+        seen_ids.add(spec["run_id"])
+        seen_paths.add(spec["artifact_dir"])
+        if (
+            role not in required_roles
+            or role != f"{spec['train_domain']}_{spec['model']}"
+            or spec["model"] not in expected_comparison["models"]
+            or spec["train_domain"] not in expected_comparison["training_domains"]
+        ):
+            raise ReportValidationError(f"manifest.json runs[{index}] has unexpected model, domain, or role")
+        expected_device = profiles[spec["model"]]["device"]
+        if spec["expected_device"] != expected_device:
+            raise ReportValidationError(
+                f"manifest.json runs[{index}].expected_device must be {expected_device!r}"
+            )
+        batch = spec["prediction_batch_size"]
+        if type(batch) is not int or batch != expected_batches[(spec["train_domain"], spec["model"])]:
+            raise ReportValidationError(
+                f"manifest.json runs[{index}].prediction_batch_size must be "
+                f"{expected_batches[(spec['train_domain'], spec['model'])]}"
+            )
+    if seen_roles != required_roles:
+        raise ReportValidationError(f"manifest.json runs must cover roles {sorted(required_roles)}")
+
+    comparisons = manifest.get("comparisons")
+    if not isinstance(comparisons, list) or len(comparisons) != 4:
+        raise ReportValidationError("manifest.json field comparisons must contain four explicit comparisons")
+    spec_by_role = {spec["role"]: spec for spec in runs}
+    seen_comparison_ids: set[str] = set()
+    seen_pairs: set[tuple[str, str]] = set()
+    expected_pairs = {
+        (domain, f"{domain}_catboost", f"{domain}_{candidate}")
+        for domain in expected_comparison["training_domains"]
+        for candidate in ("tabpfn", "tabicl")
+    }
+    actual_pairs: set[tuple[str, str, str]] = set()
+    for index, item in enumerate(comparisons):
+        if not isinstance(item, dict):
+            raise ReportValidationError(f"manifest.json field comparisons[{index}] must be an object")
+        if not all(
+            isinstance(item.get(key), str) and item[key]
+            for key in ("id", "training_domain", "baseline_role", "candidate_role")
+        ):
+            raise ReportValidationError(f"manifest.json comparisons[{index}] requires string identifiers")
+        if item["id"] in seen_comparison_ids:
+            raise ReportValidationError(f"manifest.json has duplicate comparison id {item['id']!r}")
+        seen_comparison_ids.add(item["id"])
+        baseline_role = item["baseline_role"]
+        candidate_role = item["candidate_role"]
+        if baseline_role == candidate_role:
+            raise ReportValidationError(f"manifest.json comparisons[{index}] cannot compare a role with itself")
+        if baseline_role not in spec_by_role or candidate_role not in spec_by_role:
+            raise ReportValidationError(f"manifest.json comparisons[{index}] references an unknown run role")
+        baseline = spec_by_role[baseline_role]
+        candidate = spec_by_role[candidate_role]
+        if (
+            baseline["train_domain"] != item["training_domain"]
+            or candidate["train_domain"] != item["training_domain"]
+        ):
+            raise ReportValidationError(
+                f"manifest.json comparisons[{index}] contains a cross-training-domain pair"
+            )
+        if baseline["model"] != "catboost" or candidate["model"] not in {"tabpfn", "tabicl"}:
+            raise ReportValidationError(
+                f"manifest.json comparisons[{index}] must use CatBoost baseline and a foundation-model candidate"
+            )
+        pair = (baseline_role, candidate_role)
+        if pair in seen_pairs:
+            raise ReportValidationError(f"manifest.json has duplicate comparison {baseline_role!r} vs {candidate_role!r}")
+        seen_pairs.add(pair)
+        actual_pairs.add((item["training_domain"], baseline_role, candidate_role))
+    if actual_pairs != expected_pairs:
+        raise ReportValidationError("manifest.json comparisons must declare both candidates against CatBoost per domain")
+
+    differences = manifest.get("expected_methodological_differences")
+    if not isinstance(differences, list) or not differences or not all(
+        isinstance(item, str) and item.strip() for item in differences
+    ):
+        raise ReportValidationError(
+            "manifest.json field expected_methodological_differences must contain explanatory strings"
+        )
+    return runs
+
+
+def _check_manifest(manifest: Any) -> list[dict[str, Any]]:
+    if not isinstance(manifest, dict):
+        raise ReportValidationError("manifest.json must contain a JSON object")
+    schema_version = manifest.get("report_schema_version")
+    if type(schema_version) is not int:
+        raise ReportValidationError("manifest.json field report_schema_version must be a supported integer")
+    if schema_version == 1:
+        return _check_manifest_v1(manifest)
+    if schema_version == 2:
+        return _check_manifest_v2(manifest)
+    raise ReportValidationError(f"unsupported report_schema_version {schema_version!r}")
+
+
 def _input_run_dir(spec: dict[str, Any], runs_root: Path) -> Path:
     configured = Path(spec["artifact_dir"])
     candidate = configured if configured.is_absolute() else PROJECT_ROOT / configured
@@ -268,6 +486,145 @@ def _input_run_dir(spec: dict[str, Any], runs_root: Path) -> Path:
     if not resolved.is_dir():
         raise ReportValidationError(f"run {spec['run_id']!r}, artifact_dir does not exist: {resolved}")
     return resolved
+
+
+def _validate_v2_model_profile(
+    spec: dict[str, Any],
+    config: dict[str, Any],
+    metadata: dict[str, Any],
+    manifest: dict[str, Any],
+) -> None:
+    model_name = spec["model"]
+    model = metadata.get("model")
+    if not isinstance(model, dict):
+        _fail(spec["run_id"], "metadata.json", "model", "missing recorded model profile")
+    params = config.get("model_params")
+    compute = metadata.get("compute_settings")
+    if model_name == "catboost":
+        if not isinstance(params, dict) or not isinstance(compute, dict):
+            _fail(spec["run_id"], "metadata.json/config.json", "model profile", "required CatBoost profile is missing")
+        if model.get("validation_used") is not True:
+            _fail(spec["run_id"], "metadata.json", "model.validation_used", "CatBoost must use same-domain validation")
+        if (
+            spec["expected_device"] != "CPU"
+            or params.get("task_type") != "CPU"
+            or compute.get("task_type") != "CPU"
+        ):
+            _fail(spec["run_id"], "config.json", "model_params.task_type", "expected CatBoost CPU execution")
+        return
+
+    effective = model.get("effective_init_parameters")
+    requested = model.get("requested_parameters")
+    if (
+        not isinstance(params, dict)
+        or not isinstance(effective, dict)
+        or not isinstance(requested, dict)
+        or not isinstance(compute, dict)
+    ):
+        _fail(spec["run_id"], "metadata.json/config.json", "model profile", "required effective profile is missing")
+
+    if model.get("validation_used") is not False:
+        _fail(spec["run_id"], "metadata.json", "model.validation_used", "foundation models must not use validation")
+    policy = model.get("validation_policy")
+    if not isinstance(policy, str) or "Unused" not in policy:
+        _fail(spec["run_id"], "metadata.json", "model.validation_policy", "expected an explicit unused-validation policy")
+    if not str(compute.get("device", "")).startswith("cuda:"):
+        _fail(spec["run_id"], "metadata.json", "compute_settings.device", "expected recorded CUDA execution")
+
+    profile = manifest["model_profiles"][model_name]
+    if model_name == "tabpfn":
+        checkpoint = model.get("checkpoint")
+        if not isinstance(checkpoint, dict) or checkpoint.get("generation") != profile["generation"]:
+            _fail(spec["run_id"], "metadata.json", "model.checkpoint.generation", "does not match declared TabPFN generation")
+        if params.get("inference_precision") != profile["inference_precision"]:
+            _fail(spec["run_id"], "config.json", "model_params.inference_precision", "does not match declared FP32 profile")
+        if params.get("n_estimators") != profile["n_estimators"]:
+            _fail(spec["run_id"], "config.json", "model_params.n_estimators", "does not match declared ensemble")
+        if (
+            model.get("effective_ensemble_count") != profile["n_estimators"]
+            or requested.get("n_estimators") != profile["n_estimators"]
+            or effective.get("inference_precision") != "torch.float32"
+            or requested.get("inference_precision") != profile["inference_precision"]
+            or compute.get("forced_dtype") != "torch.float32"
+            or compute.get("autocast_enabled") is not False
+            or compute.get("n_estimators") != profile["n_estimators"]
+        ):
+            _fail(spec["run_id"], "metadata.json", "model effective precision/ensemble", "does not match declared TabPFN profile")
+        return
+
+    checkpoint = model.get("checkpoint")
+    if not isinstance(checkpoint, dict):
+        _fail(spec["run_id"], "metadata.json", "model.checkpoint", "missing recorded TabICL checkpoint metadata")
+    try:
+        configured_checkpoint = (PROJECT_ROOT / params["model_path"]).resolve()
+        recorded_checkpoint = Path(checkpoint.get("path", "")).resolve()
+    except (KeyError, OSError, TypeError, ValueError):
+        _fail(spec["run_id"], "config.json/metadata.json", "TabICL checkpoint path", "is invalid")
+    if configured_checkpoint != recorded_checkpoint:
+        _fail(spec["run_id"], "metadata.json", "model.checkpoint.path", "disagrees with config.json")
+    if (
+        checkpoint.get("generation") != profile["generation"]
+        or checkpoint.get("revision") != profile["checkpoint_revision"]
+        or checkpoint.get("filename") != profile["checkpoint_filename"]
+        or model.get("tabicl_version") != profile["package_version"]
+        or not isinstance(checkpoint.get("sha256"), str)
+        or len(checkpoint["sha256"]) != 64
+        or any(character not in "0123456789abcdef" for character in checkpoint["sha256"])
+    ):
+        _fail(spec["run_id"], "metadata.json", "model.checkpoint", "does not match declared TabICLv2 checkpoint")
+    expected_config = {
+        "norm_methods": profile["normalization"],
+        "n_estimators": profile["n_estimators"],
+        "batch_size": profile["native_ensemble_batch_size"],
+        "kv_cache": profile["kv_cache"],
+        "use_amp": profile["use_amp"],
+        "use_fa3": profile["use_fa3"],
+        "offload_mode": profile["column_output_storage"],
+    }
+    for key, expected in expected_config.items():
+        if params.get(key) != expected or requested.get(key) != expected or effective.get(key) != expected:
+            _fail(
+                spec["run_id"], "config.json/metadata.json",
+                f"TabICL {key}", f"does not match declared experimental profile {expected!r}",
+            )
+    preprocessing = model.get("preprocessing")
+    diagnostics = model.get("native_diagnostics")
+    if not isinstance(preprocessing, dict) or not isinstance(diagnostics, dict):
+        _fail(spec["run_id"], "metadata.json", "model preprocessing/native_diagnostics", "required TabICL evidence is missing")
+    recovery_detection = diagnostics.get("recovery_detection")
+    limitations = diagnostics.get("limitations")
+    if (
+        not isinstance(recovery_detection, str)
+        or not recovery_detection
+        or type(diagnostics.get("swap_fallback_detected")) is not bool
+        or not isinstance(diagnostics.get("operations"), list)
+        or not isinstance(limitations, str)
+    ):
+        _fail(spec["run_id"], "metadata.json", "model.native_diagnostics", "invalid diagnostic evidence")
+    if (
+        model.get("experimental_profile") != profile["profile_id"]
+        or model.get("effective_ensemble_count") != profile["n_estimators"]
+        or compute.get("n_estimators") != profile["n_estimators"]
+        or compute.get("ensemble_batch_size") != profile["native_ensemble_batch_size"]
+        or compute.get("use_amp") is not False
+        or compute.get("use_fa3") is not False
+        or compute.get("kv_cache") is not False
+        or compute.get("cuda_matmul_allow_tf32") is not False
+        or preprocessing.get("normalization_views") != profile["normalization"]
+    ):
+        _fail(spec["run_id"], "metadata.json", "model/compute profile", "does not match declared TabICL profile")
+    inference_config = compute.get("inference_config")
+    column_config = inference_config.get("COL_CONFIG") if isinstance(inference_config, dict) else None
+    if (
+        not isinstance(column_config, dict)
+        or column_config.get("offload") != profile["column_output_storage"]
+        or column_config.get("use_amp") is not profile["use_amp"]
+        or column_config.get("use_fa3") is not profile["use_fa3"]
+    ):
+        _fail(spec["run_id"], "metadata.json", "compute_settings.inference_config.COL_CONFIG", "does not match declared TabICL profile")
+    profile_name = model.get("experimental_profile")
+    if profile_name != "tabicl_v2_none_fp32_uncached":
+        _fail(spec["run_id"], "metadata.json", "model.experimental_profile", "expected explicit none/FP32/uncached profile")
 
 
 def validate_run(spec: dict[str, Any], run_dir: Path, manifest: dict[str, Any]) -> RunArtifacts:
@@ -344,9 +701,15 @@ def validate_run(spec: dict[str, Any], run_dir: Path, manifest: dict[str, Any]) 
             _fail(run, "config.json", "model_params.task_type", "expected CatBoost CPU execution")
         if spec["expected_device"] != "CPU":
             _fail(run, "manifest.json", "expected_device", "CatBoost run must declare CPU")
-    else:
+    elif config.get("model") == "tabpfn":
         if config.get("early_stopping_rounds") is not None:
             _fail(run, "config.json", "early_stopping_rounds", "TabPFN must not use early stopping")
+        params = config.get("model_params")
+        if not isinstance(params, dict) or not str(params.get("device", "")).startswith("cuda:"):
+            _fail(run, "config.json", "model_params.device", "expected recorded CUDA execution")
+    else:
+        if config.get("early_stopping_rounds") is not None:
+            _fail(run, "config.json", "early_stopping_rounds", "TabICL must not use early stopping")
         params = config.get("model_params")
         if not isinstance(params, dict) or not str(params.get("device", "")).startswith("cuda:"):
             _fail(run, "config.json", "model_params.device", "expected recorded CUDA execution")
@@ -358,6 +721,27 @@ def validate_run(spec: dict[str, Any], run_dir: Path, manifest: dict[str, Any]) 
         _fail(run, "metadata.json", "schema.target", f"expected {comparison['target']!r}")
     if schema.get("feature_order") != comparison["feature_order"]:
         _fail(run, "metadata.json", "schema.feature_order", "does not match the manifest feature order")
+    categorical_features = comparison.get("categorical_features", CATEGORICAL_FEATURES)
+    numeric_features = [
+        feature for feature in comparison["feature_order"]
+        if feature not in categorical_features
+    ]
+    if (
+        schema.get("categorical_features") != categorical_features
+        or schema.get("numeric_features") != numeric_features
+    ):
+        _fail(run, "metadata.json", "schema categorical/numeric features", "does not match the fixed feature definitions")
+    model_metadata = metadata.get("model")
+    if isinstance(model_metadata, dict):
+        recorded_categorical = model_metadata.get("categorical_features")
+        if (
+            (manifest["report_schema_version"] == 2 and recorded_categorical != categorical_features)
+            or (
+                "categorical_features" in model_metadata
+                and recorded_categorical != categorical_features
+            )
+        ):
+            _fail(run, "metadata.json", "model.categorical_features", "does not match the fixed categorical features")
 
     sampling = metadata.get("sampling")
     training = metadata.get("training_context")
@@ -621,6 +1005,26 @@ def validate_run(spec: dict[str, Any], run_dir: Path, manifest: dict[str, Any]) 
             _integer(gpu_memory.get(field), run, "metadata.json", f"resources.peak_gpu_memory.{field}")
         if not isinstance(gpu_memory.get("device"), str) or not isinstance(gpu_memory.get("scope"), str):
             _fail(run, "metadata.json", "resources.peak_gpu_memory", "device and scope descriptions are required")
+    if manifest["report_schema_version"] == 2:
+        _validate_v2_model_profile(spec, config, metadata, manifest)
+    model = metadata.get("model")
+    if not isinstance(model, dict):
+        model = {}
+    checkpoint_metadata = model.get("checkpoint")
+    profile_id = {
+        "catboost": "catboost_cpu",
+        "tabpfn": "tabpfn_v35_float32",
+        "tabicl": model.get("experimental_profile"),
+    }[spec["model"]]
+    generation = (
+        manifest.get("model_profiles", {}).get("catboost", {}).get("generation", "CatBoost")
+        if spec["model"] == "catboost"
+        else (
+            checkpoint_metadata.get("generation")
+            if isinstance(checkpoint_metadata, dict)
+            else None
+        )
+    )
     return RunArtifacts(
         spec=spec,
         run_dir=run_dir,
@@ -634,6 +1038,8 @@ def validate_run(spec: dict[str, Any], run_dir: Path, manifest: dict[str, Any]) 
         display_names={
             "train_domain": display_domain_name(spec["train_domain"]),
             **{domain: display_domain_name(domain) for domain in domains},
+            "model_profile_id": profile_id,
+            "model_generation": generation,
         },
     )
 
@@ -659,56 +1065,66 @@ def validate_comparison(manifest: dict[str, Any], manifest_path: Path) -> tuple[
             "selected runs use different calibration bin counts; one consistent descriptive "
             "calibration definition is required"
         )
+    _check_calibration_boundary_compatibility(
+        loaded,
+        manifest["comparison"]["evaluation_domains"],
+    )
     alignments: list[dict[str, Any]] = []
     domains = manifest["comparison"]["evaluation_domains"]
     for train_domain in manifest["comparison"]["training_domains"]:
-        catboost = by_role[f"{train_domain}_catboost"]
-        tabpfn = by_role[f"{train_domain}_tabpfn"]
-        if catboost.training_identities != tabpfn.training_identities:
-            raise ReportValidationError(
-                f"training identity mismatch for {train_domain}: "
-                f"{catboost.spec['run_id']} vs {tabpfn.spec['run_id']}"
-            )
-        cat_sampling = catboost.metadata["sampling"]
-        tab_sampling = tabpfn.metadata["sampling"]
-        for field in ("requested_budget", "sampling_seed", "algorithm", "available_training_rows",
-                      "selected_training_rows", "selected_class_counts"):
-            if cat_sampling.get(field) != tab_sampling.get(field):
+        domain_runs = [
+            by_role[f"{train_domain}_{model}"]
+            for model in manifest["comparison"]["models"]
+        ]
+        reference_run = domain_runs[0]
+        for compared_run in domain_runs[1:]:
+            if reference_run.training_identities != compared_run.training_identities:
                 raise ReportValidationError(
-                    f"training sampling mismatch for {train_domain}, field sampling.{field}: "
-                    f"{catboost.spec['run_id']} vs {tabpfn.spec['run_id']}"
+                    f"training identity mismatch for {train_domain}: "
+                    f"{reference_run.spec['run_id']} vs {compared_run.spec['run_id']}"
                 )
-        if catboost.metadata["schema"] != tabpfn.metadata["schema"]:
-            raise ReportValidationError(f"feature order or target mismatch for training domain {train_domain}")
-        for split_name in (f"{train_domain}/train", f"{train_domain}/val"):
-            if catboost.metadata["splits"][split_name] != tabpfn.metadata["splits"][split_name]:
-                raise ReportValidationError(
-                    f"prepared split fingerprints mismatch for training domain {train_domain}, split {split_name}"
-                )
-        if catboost.metadata["prepared_file_sha256"] != tabpfn.metadata["prepared_file_sha256"]:
-            raise ReportValidationError(f"prepared-data fingerprints mismatch for training domain {train_domain}")
-        for domain in domains:
-            cat_map = catboost.predictions[domain]
-            tab_map = tabpfn.predictions[domain]
-            if cat_map.keys() != tab_map.keys():
-                raise ReportValidationError(
-                    f"test identity mismatch for {train_domain}-trained pair on evaluation domain {domain}"
-                )
-            for identity in cat_map:
-                if cat_map[identity]["y_true"] != tab_map[identity]["y_true"]:
+            reference_sampling = reference_run.metadata["sampling"]
+            compared_sampling = compared_run.metadata["sampling"]
+            for field in ("requested_budget", "sampling_seed", "algorithm", "available_training_rows",
+                          "selected_training_rows", "selected_class_counts"):
+                if reference_sampling.get(field) != compared_sampling.get(field):
                     raise ReportValidationError(
-                        f"test label mismatch for {train_domain}-trained pair on {domain}, identity {identity}"
+                        f"training sampling mismatch for {train_domain}, field sampling.{field}: "
+                        f"{reference_run.spec['run_id']} vs {compared_run.spec['run_id']}"
                     )
-            cat_order = catboost.prediction_order[domain]
-            tab_order = tabpfn.prediction_order[domain]
-            alignments.append({
-                "training_domain": train_domain,
-                "evaluation_domain": domain,
-                "identities_match": True,
-                "labels_match": True,
-                "prediction_order_differs": cat_order != tab_order,
-                "alignment_key": IDENTITY_COLUMNS[domain],
-            })
+            if reference_run.metadata["schema"] != compared_run.metadata["schema"]:
+                raise ReportValidationError(f"feature order or target mismatch for training domain {train_domain}")
+            for split_name in (f"{train_domain}/train", f"{train_domain}/val"):
+                if reference_run.metadata["splits"][split_name] != compared_run.metadata["splits"][split_name]:
+                    raise ReportValidationError(
+                        f"prepared split fingerprints mismatch for training domain {train_domain}, split {split_name}"
+                    )
+            if reference_run.metadata["prepared_file_sha256"] != compared_run.metadata["prepared_file_sha256"]:
+                raise ReportValidationError(f"prepared-data fingerprints mismatch for training domain {train_domain}")
+            for domain in domains:
+                reference_values = reference_run.predictions[domain]
+                compared_values = compared_run.predictions[domain]
+                if reference_values.keys() != compared_values.keys():
+                    raise ReportValidationError(
+                        f"test identity mismatch for {train_domain}-trained pair on evaluation domain {domain}"
+                    )
+                for identity in reference_values:
+                    if reference_values[identity]["y_true"] != compared_values[identity]["y_true"]:
+                        raise ReportValidationError(
+                            f"test label mismatch for {train_domain}-trained pair on {domain}, identity {identity}"
+                        )
+                alignments.append({
+                    "training_domain": train_domain,
+                    "reference_run_id": reference_run.spec["run_id"],
+                    "compared_run_id": compared_run.spec["run_id"],
+                    "evaluation_domain": domain,
+                    "identities_match": True,
+                    "labels_match": True,
+                    "prediction_order_differs": (
+                        reference_run.prediction_order[domain] != compared_run.prediction_order[domain]
+                    ),
+                    "alignment_key": IDENTITY_COLUMNS[domain],
+                })
 
     cross_run_population_checks: list[dict[str, Any]] = []
     reference = loaded[0]
@@ -753,8 +1169,24 @@ def validate_comparison(manifest: dict[str, Any], manifest_path: Path) -> tuple[
             cross_run_population_checks.append(check)
 
     manifest_hash = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+    native_diagnostic_evidence = []
+    if manifest["report_schema_version"] == 2:
+        for run in loaded:
+            if run.spec["model"] != "tabicl":
+                continue
+            diagnostics = run.metadata["model"]["native_diagnostics"]
+            native_diagnostic_evidence.append({
+                "run_id": run.spec["run_id"],
+                "profile_id": run.metadata["model"]["experimental_profile"],
+                "recovery_detection": diagnostics["recovery_detection"],
+                "swap_fallback_detected": diagnostics["swap_fallback_detected"],
+                "operation_count": len(diagnostics["operations"]),
+                "limitations": diagnostics["limitations"],
+            })
     return loaded, {
         "status": "passed",
+        "report_schema_version": manifest["report_schema_version"],
+        "output_schema_version": manifest.get("output_schema_version", 1),
         "claims": (
             "Saved-artifact agreement verifies recorded experiment consistency; it does not independently "
             "prove that every earlier data-preparation step was correct."
@@ -762,9 +1194,35 @@ def validate_comparison(manifest: dict[str, Any], manifest_path: Path) -> tuple[
         "metric_absolute_and_relative_tolerance": METRIC_TOLERANCE,
         "identity_alignments": alignments,
         "cross_run_population_checks": cross_run_population_checks,
+        "expected_methodological_differences": manifest["expected_methodological_differences"],
+        "native_diagnostic_evidence": native_diagnostic_evidence,
         "validated_runs": [run.spec["run_id"] for run in loaded],
         "input_manifest_sha256": manifest_hash,
         "input_artifact_sha256": {
             run.spec["run_id"]: run.artifact_hashes for run in loaded
         },
     }
+
+
+def _check_calibration_boundary_compatibility(
+    runs: list[RunArtifacts],
+    domains: list[str],
+) -> None:
+    if not runs:
+        raise ReportValidationError("calibration boundary validation requires at least one run")
+    reference = runs[0]
+    for run in runs[1:]:
+        for domain in domains:
+            reference_boundaries = [
+                (entry["lower_bound"], entry["upper_bound"])
+                for entry in reference.metrics[domain]["calibration_bins"]
+            ]
+            compared_boundaries = [
+                (entry["lower_bound"], entry["upper_bound"])
+                for entry in run.metrics[domain]["calibration_bins"]
+            ]
+            if reference_boundaries != compared_boundaries:
+                raise ReportValidationError(
+                    "calibration bin boundaries differ across selected runs for "
+                    f"evaluation domain {domain}: {reference.spec['run_id']} vs {run.spec['run_id']}"
+                )

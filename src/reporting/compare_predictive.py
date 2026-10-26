@@ -3,12 +3,14 @@ from __future__ import annotations
 import argparse
 import json
 import platform
+import re
 import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from importlib.metadata import PackageNotFoundError, version
+from urllib.parse import unquote, urlparse
 
 from src.paths import PROJECT_ROOT, RESULTS_DIR
 from src.reporting.tables import build_report, generate_tables
@@ -18,6 +20,8 @@ from src.reporting.validation import (
     _input_run_dir,
     validate_comparison,
 )
+
+_MARKDOWN_LINK = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
 
 
 def _resolve_from_project(value: Path) -> Path:
@@ -49,6 +53,34 @@ def _output_directory(value: Path, manifest: dict[str, Any]) -> Path:
 def _write_json(path: Path, value: Any) -> None:
     text = json.dumps(value, allow_nan=False, indent=2, sort_keys=True)
     path.write_text(text + "\n", encoding="utf-8")
+
+
+def _verify_outputs(output: Path, required_outputs: set[str]) -> None:
+    missing_or_empty = sorted(
+        name for name in required_outputs
+        if not (output / name).is_file() or (output / name).stat().st_size == 0
+    )
+    if missing_or_empty:
+        raise OSError(f"report output files are missing or empty: {missing_or_empty}")
+
+    report_path = output / "report.md"
+    report_text = report_path.read_text(encoding="utf-8")
+    unresolved_links = []
+    for match in _MARKDOWN_LINK.finditer(report_text):
+        destination = match.group(1).split()[0].strip("<>")
+        parsed = urlparse(destination)
+        if parsed.scheme or parsed.netloc or destination.startswith("#"):
+            continue
+        relative_path = unquote(parsed.path)
+        if not relative_path:
+            continue
+        linked_path = (report_path.parent / relative_path).resolve()
+        if not linked_path.is_relative_to(output.resolve()) or not linked_path.is_file():
+            unresolved_links.append(destination)
+        elif linked_path.stat().st_size == 0:
+            unresolved_links.append(destination)
+    if unresolved_links:
+        raise OSError(f"report contains unresolved or empty relative links: {sorted(set(unresolved_links))}")
 
 
 def _reporting_environment() -> dict[str, Any]:
@@ -151,6 +183,7 @@ def run_report(
     stage = "input_validation"
     figure_files: list[str] = []
     matplotlib_version: str | None = None
+    report_manifest: dict[str, Any] | None = None
     try:
         runs, validation = validate_comparison(manifest, resolved_manifest)
         input_validation_status = "passed"
@@ -193,9 +226,15 @@ def run_report(
         )
         report_manifest = {
             "report_schema_version": manifest["report_schema_version"],
+            "output_schema_version": manifest.get("output_schema_version", 1),
+            "input_validation_status": "passed",
+            "report_generation_status": "in_progress",
             "generated_at_utc": generated_at,
             "source_manifest": str(resolved_manifest),
             "selection": manifest["comparison"],
+            "declared_comparisons": manifest.get("comparisons", []),
+            "model_profiles": manifest.get("model_profiles", {}),
+            "expected_methodological_differences": manifest["expected_methodological_differences"],
             "resolved_runs": [
                 {
                     "role": run.spec["role"],
@@ -216,7 +255,6 @@ def run_report(
         }
 
         stage = "output_writing"
-        _write_json(output / "manifest.json", report_manifest)
         for name, contents in tables.items():
             (output / name).write_text(contents, encoding="utf-8", newline="")
         (output / "report.md").write_text(report, encoding="utf-8", newline="")
@@ -230,24 +268,36 @@ def run_report(
             "report.md",
         }
         required_outputs.update(f"figures/{name}" for name in figure_files)
-        missing_outputs = sorted(
-            name for name in required_outputs if not (output / name).is_file()
-        )
-        if missing_outputs:
-            raise OSError(f"report output files are missing: {missing_outputs}")
+        stage = "output_writing"
+        _write_json(output / "manifest.json", report_manifest)
+        stage = "output_validation"
+        _verify_outputs(output, required_outputs)
 
         validation.update({
             "status": "completed",
             "input_validation_status": input_validation_status,
             "report_generation_status": "completed",
         })
+        report_manifest["report_generation_status"] = "completed"
+        _write_json(output / "manifest.json", report_manifest)
         _write_json(output / "validation.json", validation)
+        _verify_outputs(output, required_outputs)
     except Exception as exc:
         if stage == "input_validation" and input_validation_status == "in_progress":
             input_validation_status = "failed"
         _failure_diagnostic(
             output, generated_at, stage, exc, input_validation_status, with_figures,
         )
+        if report_manifest is not None and (output / "manifest.json").exists():
+            report_manifest["report_generation_status"] = "failed"
+            try:
+                _write_json(output / "manifest.json", report_manifest)
+            except Exception as manifest_error:
+                print(
+                    f"Could not update manifest diagnostics after {type(exc).__name__}: "
+                    f"{manifest_error}",
+                    file=sys.stderr,
+                )
         raise
     return output
 

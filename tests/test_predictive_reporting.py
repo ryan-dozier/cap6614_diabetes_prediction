@@ -4,6 +4,7 @@ import csv
 import gzip
 import json
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -20,6 +21,9 @@ from src.reporting.validation import ReportValidationError
 PROJECT = Path(__file__).resolve().parents[1]
 BASE_MANIFEST = json.loads(
     (PROJECT / "configs/reports/predictive_n2000_seed42.json").read_text(encoding="utf-8")
+)
+TABICL_MANIFEST = json.loads(
+    (PROJECT / "configs/reports/predictive_n2000_seed42_with_tabicl.json").read_text(encoding="utf-8")
 )
 FEATURES = BASE_MANIFEST["comparison"]["feature_order"]
 DOMAINS = BASE_MANIFEST["comparison"]["evaluation_domains"]
@@ -192,7 +196,15 @@ def fixture(root: Path) -> tuple[dict, Path]:
             "configuration": config,
             "seed": 42,
             "prediction_batch_size": batch_size,
-            "schema": {"target": "diagnosed_diabetes", "feature_order": FEATURES},
+            "schema": {
+                "target": "diagnosed_diabetes",
+                "feature_order": FEATURES,
+                "categorical_features": ["ethnicity", "gender", "smoking_status"],
+                "numeric_features": [
+                    feature for feature in FEATURES
+                    if feature not in {"ethnicity", "gender", "smoking_status"}
+                ],
+            },
             "prepared_file_sha256": prepared,
             "training_partition_full": full_summary,
             "training_context": training_context,
@@ -214,6 +226,139 @@ def fixture(root: Path) -> tuple[dict, Path]:
 
     manifest_path = root / "configs/test_manifest.json"
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    _write_json(manifest_path, manifest)
+    return manifest, manifest_path
+
+
+def tabicl_fixture(root: Path) -> tuple[dict, Path]:
+    _, _ = fixture(root)
+    manifest = json.loads(json.dumps(TABICL_MANIFEST))
+    manifest_path = root / "configs/test_manifest_with_tabicl.json"
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+
+    for spec in manifest["runs"]:
+        role = spec["role"]
+        train_domain = spec["train_domain"]
+        source_role = role if not role.endswith("_tabicl") else role.removesuffix("_tabicl") + "_tabpfn"
+        source_dir = root / "results/predictive" / source_role
+        run_dir = root / "results/predictive" / role
+        if role.endswith("_tabicl"):
+            shutil.copytree(source_dir, run_dir)
+        spec["artifact_dir"] = f"results/predictive/{role}"
+        config_path = run_dir / "config.json"
+        metadata_path = run_dir / "metadata.json"
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+
+        config.update({
+            "experiment_name": spec["run_id"],
+            "model": spec["model"],
+            "train_domain": train_domain,
+            "validation_domain": train_domain,
+            "prediction_batch_size": spec["prediction_batch_size"],
+            "output_dir": str(run_dir.resolve()),
+        })
+        model = spec["model"]
+        if model == "tabpfn":
+            config["model_params"] = {
+                "n_estimators": 4,
+                "device": "cuda:0",
+                "fit_mode": "fit_preprocessors",
+                "inference_precision": "float32",
+                "memory_saving_mode": True,
+            }
+        elif model == "tabicl":
+            checkpoint_relative = (
+                "checkpoints/tabicl/fixture/tabicl-classifier-v2-20260212.ckpt"
+            )
+            config["model_params"] = {
+                "model_path": checkpoint_relative,
+                "norm_methods": ["none"],
+                "device": "cuda:0",
+                "n_estimators": 8,
+                "batch_size": 1,
+                "use_amp": False,
+                "use_fa3": False,
+                "kv_cache": False,
+                "offload_mode": "cpu",
+                "n_jobs": 4,
+            }
+        metadata["configuration"] = config
+        metadata["prediction_batch_size"] = spec["prediction_batch_size"]
+        metadata["seed"] = 42
+        compute = metadata["compute_settings"]
+        if model == "catboost":
+            model_metadata = {
+                "validation_used": True,
+                "categorical_features": ["ethnicity", "gender", "smoking_status"],
+                "compute_settings": compute,
+            }
+        elif model == "tabpfn":
+            compute.update({
+                "forced_dtype": "torch.float32",
+                "autocast_enabled": False,
+                "n_estimators": 4,
+            })
+            model_metadata = {
+                "checkpoint": {"generation": "TabPFN v3.5 (20260909)"},
+                "effective_ensemble_count": 4,
+                "effective_init_parameters": {"inference_precision": "torch.float32"},
+                "requested_parameters": {"inference_precision": "float32", "n_estimators": 4},
+                "validation_policy": "Unused; no early stopping, calibration, tuning, or validation context.",
+                "validation_used": False,
+                "categorical_features": ["ethnicity", "gender", "smoking_status"],
+                "compute_settings": compute,
+            }
+        else:
+            checkpoint_path = (root / config["model_params"]["model_path"]).resolve()
+            compute.update({
+                "device": "cuda:0",
+                "device_name": "Synthetic GPU",
+                "n_estimators": 8,
+                "ensemble_batch_size": 1,
+                "use_amp": False,
+                "use_fa3": False,
+                "kv_cache": False,
+                "cuda_matmul_allow_tf32": False,
+                "inference_config": {
+                    "COL_CONFIG": {"offload": "cpu", "use_amp": False, "use_fa3": False},
+                    "ROW_CONFIG": {"offload": False, "use_amp": False, "use_fa3": False},
+                    "ICL_CONFIG": {"offload": False, "use_amp": False, "use_fa3": False},
+                },
+            })
+            requested = dict(config["model_params"])
+            effective = dict(requested)
+            effective["model_path"] = str(checkpoint_path)
+            model_metadata = {
+                "checkpoint": {
+                    "generation": "TabICLv2 classifier",
+                    "revision": "4dcd344ece2c00be9e831fdd35bed57b5ad83e19",
+                    "filename": "tabicl-classifier-v2-20260212.ckpt",
+                    "sha256": "a" * 64,
+                    "path": str(checkpoint_path),
+                },
+                "tabicl_version": "2.2.0",
+                "experimental_profile": "tabicl_v2_none_fp32_uncached",
+                "effective_ensemble_count": 8,
+                "effective_init_parameters": effective,
+                "requested_parameters": requested,
+                "preprocessing": {"normalization_views": ["none"]},
+                "validation_policy": "Unused; train-only context/preprocessing, no tuning or calibration.",
+                "validation_used": False,
+                "categorical_features": ["ethnicity", "gender", "smoking_status"],
+                "native_diagnostics": {
+                    "recovery_detection": "no_recovery_detected",
+                    "swap_fallback_detected": False,
+                    "operations": [{"operation": "predict"}],
+                    "limitations": "Captured output only; not a complete scheduling trace.",
+                },
+                "compute_settings": compute,
+            }
+        metadata["compute_settings"] = compute
+        metadata["model"] = model_metadata
+        _write_json(config_path, config)
+        _write_json(metadata_path, metadata)
+
     _write_json(manifest_path, manifest)
     return manifest, manifest_path
 
@@ -506,6 +651,32 @@ class PredictiveReportingTests(unittest.TestCase):
         with self.assertRaisesRegex(ReportValidationError, "refusing to overwrite"):
             compare_predictive.run_report(self.manifest_path, Path("results/reports/first"))
 
+    def test_output_verification_rejects_empty_files_and_unresolved_links(self):
+        output = self.root / "output-verification"
+        output.mkdir()
+        (output / "report.md").write_text("[missing](missing.csv)\n", encoding="utf-8")
+        (output / "empty.csv").write_text("", encoding="utf-8")
+        with self.assertRaisesRegex(OSError, "missing or empty"):
+            compare_predictive._verify_outputs(output, {"report.md", "empty.csv"})
+        (output / "empty.csv").write_text("value\n1\n", encoding="utf-8")
+        with self.assertRaisesRegex(OSError, "unresolved or empty relative links"):
+            compare_predictive._verify_outputs(output, {"report.md", "empty.csv"})
+        (output / "missing.csv").write_text("ok\n", encoding="utf-8")
+        compare_predictive._verify_outputs(output, {"report.md", "empty.csv"})
+
+    def test_unresolved_report_link_leaves_failure_diagnostic(self):
+        with patch.object(compare_predictive, "build_report", return_value="[missing](missing.csv)\n"):
+            with self.assertRaisesRegex(OSError, "unresolved or empty relative links"):
+                compare_predictive.run_report(
+                    self.manifest_path,
+                    Path("results/reports/unresolved-link"),
+                )
+        diagnostic = self._read_json(
+            self.root / "results/reports/unresolved-link/validation.json",
+        )
+        self.assertEqual(diagnostic["failed_stage"], "output_validation")
+        self.assertEqual(diagnostic["report_generation_status"], "failed")
+
     def test_figure_report_outputs_png_pdf_and_resolvable_relative_links(self):
         output = compare_predictive.run_report(
             self.manifest_path,
@@ -756,6 +927,349 @@ class ReportingImportTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("--manifest", result.stdout)
+
+
+class TabICLReportingTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.manifest, self.manifest_path = tabicl_fixture(self.root)
+        self.patches = [
+            patch.object(validation, "PROJECT_ROOT", self.root),
+            patch.object(validation, "RESULTS_DIR", self.root / "results"),
+            patch.object(compare_predictive, "PROJECT_ROOT", self.root),
+            patch.object(compare_predictive, "RESULTS_DIR", self.root / "results"),
+        ]
+        for context in self.patches:
+            context.start()
+            self.addCleanup(context.stop)
+
+    def validate(self):
+        return validation.validate_comparison(self.manifest, self.manifest_path)
+
+    def run_dir(self, role: str) -> Path:
+        spec = next(run for run in self.manifest["runs"] if run["role"] == role)
+        return self.root / spec["artifact_dir"]
+
+    def read_json(self, path: Path) -> dict:
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    def update_evaluation(self, role: str, domain: str, rows: list[dict]) -> None:
+        run_dir = self.run_dir(role)
+        PredictiveReportingTests._write_predictions(run_dir, domain, rows)
+        metrics_path = run_dir / "metrics.json"
+        metrics = self.read_json(metrics_path)
+        config = self.read_json(run_dir / "config.json")
+        metrics[domain] = evaluate_binary(
+            [int(row["y_true"]) for row in rows],
+            [float(row["y_probability"]) for row in rows],
+            config["threshold"],
+            config["calibration_bins"],
+        )
+        _write_json(metrics_path, metrics)
+        calibration_path = run_dir / "calibration_bins.csv"
+        existing = validation._read_csv(calibration_path, role, calibration_path.name)
+        retained = [row for row in existing if row["domain"] != domain]
+        _write_gzip_or_plain_calibration(
+            calibration_path,
+            retained + _calibration_rows({domain: metrics[domain]}, [domain]),
+        )
+        metadata_path = run_dir / "metadata.json"
+        metadata = self.read_json(metadata_path)
+        identity_column = "seqn" if domain == "nhanes" else "row_index"
+        metadata["splits"][f"{domain}/test"] = _summary(
+            domain,
+            "test",
+            [int(row[identity_column]) for row in rows],
+            [int(row["y_true"]) for row in rows],
+        )
+        _write_json(metadata_path, metadata)
+
+    def test_six_run_tables_have_declared_order_counts_profiles_and_signs(self):
+        runs, result = self.validate()
+        self.assertEqual(len(runs), 6)
+        self.assertEqual(len(result["cross_run_population_checks"]), 15)
+        self.assertTrue(all(
+            check["identities_match"] and check["labels_match"]
+            for check in result["cross_run_population_checks"]
+        ))
+        for domain in ("source", "kaggle"):
+            selected = [run for run in runs if run.spec["train_domain"] == domain]
+            self.assertEqual(len({tuple(run.training_identities) for run in selected}), 1)
+        metric_rows = tables.build_metric_rows(runs, self.manifest)
+        difference_rows = tables.build_difference_rows(runs, self.manifest)
+        runtime_rows = tables.build_runtime_rows(runs, self.manifest)
+        calibration_rows = tables.build_calibration_rows(runs, self.manifest)
+        self.assertEqual(len(metric_rows), 18)
+        self.assertEqual(len(difference_rows), 12)
+        self.assertEqual(len(runtime_rows), 6)
+        self.assertEqual(len(calibration_rows), 180)
+        figure_points = figures.performance_points(runs, self.manifest, "f1")
+        self.assertEqual({point["model_label"] for point in figure_points}, {
+            "CatBoost", "TabPFN", "TabICLv2",
+        })
+        self.assertEqual({point["model_marker"] for point in figure_points}, {"o", "s", "^"})
+        self.assertEqual(
+            [(row["train_domain_id"], row["model"]) for row in metric_rows[::3]],
+            [
+                ("source", "catboost"), ("source", "tabpfn"), ("source", "tabicl"),
+                ("kaggle", "catboost"), ("kaggle", "tabpfn"), ("kaggle", "tabicl"),
+            ],
+        )
+        self.assertEqual(
+            [row["comparison_id"] for row in difference_rows[::3]],
+            [
+                "source_tabpfn_vs_catboost",
+                "source_tabicl_vs_catboost",
+                "kaggle_tabpfn_vs_catboost",
+                "kaggle_tabicl_vs_catboost",
+            ],
+        )
+        for row in difference_rows:
+            self.assertGreater(row["candidate_minus_baseline_roc_auc"], 0)
+            self.assertGreater(row["candidate_minus_baseline_average_precision"], 0)
+            self.assertGreater(row["candidate_minus_baseline_f1"], 0)
+            self.assertLess(row["candidate_minus_baseline_brier_score"], 0)
+        self.assertEqual(
+            [row["external_query_batch_size"] for row in runtime_rows],
+            [256, 256, 128, 256, 1024, 128],
+        )
+        self.assertEqual(
+            [row["native_ensemble_batch_size"] for row in runtime_rows],
+            [None, None, 1, None, None, 1],
+        )
+        self.assertEqual(
+            [row["model_profile_id"] for row in metric_rows[::3]],
+            ["catboost_cpu", "tabpfn_v35_float32", "tabicl_v2_none_fp32_uncached"] * 2,
+        )
+        self.assertTrue(result["expected_methodological_differences"])
+        self.assertEqual(
+            [item["recovery_detection"] for item in result["native_diagnostic_evidence"]],
+            ["no_recovery_detected", "no_recovery_detected"],
+        )
+
+        rendered = tables.generate_tables(runs, self.manifest)
+        self.assertEqual(
+            len(list(csv.DictReader(rendered["metrics.csv"].splitlines()))),
+            18,
+        )
+        self.assertEqual(
+            len(list(csv.DictReader(rendered["metric_differences.csv"].splitlines()))),
+            12,
+        )
+        report = tables.build_report(runs, self.manifest, result, "timestamp")
+        self.assertIn("TabICL", report)
+        self.assertIn("candidate minus CatBoost", report)
+        self.assertIn("not the vendor-default normalization ensemble", report)
+        self.assertIn("do not prove unchanged scheduling", report)
+        self.assertIn("not national-population estimates", report)
+
+    def test_candidate_baseline_declarations_are_validated(self):
+        cases = [
+            (
+                "duplicate comparison",
+                lambda m: m["comparisons"][1].update(
+                    id=m["comparisons"][0]["id"],
+                    baseline_role="source_catboost",
+                    candidate_role="source_tabpfn",
+                    training_domain="source",
+                ),
+                "duplicate comparison id",
+            ),
+            ("unknown role", lambda m: m["comparisons"][0].update(candidate_role="missing_role"), "unknown run role"),
+            ("self comparison", lambda m: m["comparisons"][0].update(candidate_role="source_catboost"), "cannot compare a role with itself"),
+            ("cross domain", lambda m: m["comparisons"][0].update(candidate_role="kaggle_tabpfn"), "cross-training-domain"),
+            ("missing candidate", lambda m: m["comparisons"].pop(), "four explicit comparisons"),
+            (
+                "duplicate run id",
+                lambda m: m["runs"][1].update(run_id=m["runs"][0]["run_id"]),
+                "duplicate run_id",
+            ),
+            (
+                "duplicate artifact path",
+                lambda m: m["runs"][1].update(artifact_dir=m["runs"][0]["artifact_dir"]),
+                "duplicate artifact_dir",
+            ),
+        ]
+        for _, mutate, expected in cases:
+            broken = json.loads(json.dumps(self.manifest))
+            mutate(broken)
+            with self.subTest(expected=expected), self.assertRaisesRegex(
+                ReportValidationError, expected,
+            ):
+                validation._check_manifest(broken)
+
+    def test_shared_calibration_boundaries_are_validated_before_plotting(self):
+        runs, _ = self.validate()
+        runs[1].metrics["source"]["calibration_bins"][0]["upper_bound"] = 0.25
+        with self.assertRaisesRegex(ReportValidationError, "calibration bin boundaries differ"):
+            validation._check_calibration_boundary_compatibility(runs, DOMAINS)
+
+    def test_third_model_training_identity_sequence_mismatch_is_rejected(self):
+        run_dir = self.run_dir("source_tabicl")
+        sample_path = run_dir / "training_sample.csv.gz"
+        rows = validation._read_csv(sample_path, "tabicl", sample_path.name)
+        rows[-1]["row_index"] = str(int(rows[-1]["row_index"]) + 100000)
+        identities = [int(row["row_index"]) for row in rows]
+        PredictiveReportingTests._write_sample(run_dir, rows)
+        metadata_path = run_dir / "metadata.json"
+        metadata = self.read_json(metadata_path)
+        fingerprints = identity_fingerprints("source", "row_index", identities)
+        metadata["training_context"].update(fingerprints)
+        metadata["sampling"].update(fingerprints)
+        _write_json(metadata_path, metadata)
+        with self.assertRaisesRegex(ReportValidationError, "training identity mismatch for source"):
+            self.validate()
+
+    def test_duplicate_resolved_run_directories_are_rejected(self):
+        self.manifest["runs"][1]["artifact_dir"] = (
+            "results/predictive/source_catboost/../source_catboost"
+        )
+        with self.assertRaisesRegex(ReportValidationError, "same resolved run directory"):
+            self.validate()
+
+    def test_third_model_profile_mismatch_is_rejected(self):
+        run_dir = self.run_dir("source_tabicl")
+        config_path = run_dir / "config.json"
+        config = self.read_json(config_path)
+        config["model_params"]["norm_methods"] = ["power"]
+        _write_json(config_path, config)
+        metadata_path = run_dir / "metadata.json"
+        metadata = self.read_json(metadata_path)
+        metadata["configuration"] = config
+        _write_json(metadata_path, metadata)
+        with self.assertRaisesRegex(ReportValidationError, "TabICL norm_methods"):
+            self.validate()
+
+    def test_third_model_evaluation_identity_mismatch_is_rejected(self):
+        run_dir = self.run_dir("source_tabicl")
+        path = run_dir / "predictions_source_test.csv.gz"
+        rows = validation._read_csv(path, "tabicl", path.name)
+        rows[0]["row_index"] = "999999"
+        self.update_evaluation("source_tabicl", "source", rows)
+        with self.assertRaisesRegex(ReportValidationError, "test identity mismatch for source-trained pair"):
+            self.validate()
+
+    def test_failed_tabicl_artifact_and_prediction_metric_inconsistency_are_rejected(self):
+        run_dir = self.run_dir("source_tabicl")
+        (run_dir / "calibration_bins.csv").unlink()
+        with self.assertRaisesRegex(ReportValidationError, "required artifact is missing"):
+            self.validate()
+        with self.assertRaisesRegex(ReportValidationError, "required artifact is missing"):
+            compare_predictive.run_report(
+                self.manifest_path,
+                Path("results/reports/tabicl-incomplete"),
+            )
+        diagnostic = self.read_json(
+            self.root / "results/reports/tabicl-incomplete/validation.json",
+        )
+        self.assertEqual(diagnostic["input_validation_status"], "failed")
+        self.assertFalse(
+            (self.root / "results/reports/tabicl-incomplete/report.md").exists()
+        )
+
+        metrics_path = run_dir / "metrics.json"
+        metrics = self.read_json(metrics_path)
+        _write_gzip_or_plain_calibration(
+            run_dir / "calibration_bins.csv",
+            _calibration_rows(metrics, DOMAINS),
+        )
+        metrics["source"]["roc_auc"] = 0.123
+        _write_json(metrics_path, metrics)
+        with self.assertRaisesRegex(ReportValidationError, "prediction-derived value"):
+            self.validate()
+
+    def test_schema_two_figures_include_three_models_and_resolvable_links(self):
+        run_dir = self.run_dir("source_tabicl")
+        metadata_path = run_dir / "metadata.json"
+        metadata = self.read_json(metadata_path)
+        metadata["resources"] = {"peak_gpu_memory": None, "total_gpu_usage_bytes": None}
+        _write_json(metadata_path, metadata)
+        runs, _ = self.validate()
+        runtime = tables.build_runtime_rows(runs, self.manifest)
+        row = next(item for item in runtime if item["run_id"] == "tabicl_v2_source_strict_common_16_n2000_none_fp32_uncached_seed42")
+        self.assertIsNone(row["pytorch_peak_allocated_bytes"])
+        self.assertIsNone(row["pytorch_peak_reserved_bytes"])
+        self.assertIsNone(row["total_gpu_usage_bytes"])
+        output = compare_predictive.run_report(
+            self.manifest_path,
+            Path("results/reports/tabicl-figures"),
+            with_figures=True,
+        )
+        report_manifest = self.read_json(output / "manifest.json")
+        self.assertEqual(report_manifest["report_generation_status"], "completed")
+        self.assertEqual(len(report_manifest["figure_files"]), 12)
+        self.assertEqual(set(report_manifest["figure_files"]), {
+            f"figures/{name}" for name in figures.FIGURE_FILES
+        })
+        self.assertTrue(all(
+            (output / name).is_file() and (output / name).stat().st_size > 0
+            for name in report_manifest["figure_files"]
+        ))
+        with (output / "metrics.csv").open(encoding="utf-8", newline="") as handle:
+            self.assertEqual(len(list(csv.DictReader(handle))), 18)
+        with (output / "metric_differences.csv").open(encoding="utf-8", newline="") as handle:
+            self.assertEqual(len(list(csv.DictReader(handle))), 12)
+        report = (output / "report.md").read_text(encoding="utf-8")
+        self.assertIn(
+            "Ranking performance (ROC-AUC and average precision), classification performance "
+            "at the fixed threshold (F1), and probability quality (Brier score) measure different aspects",
+            report,
+        )
+        self.assertIn("### Timing (seconds)", report)
+        self.assertIn("### Execution profile and resources", report)
+        self.assertIn("Not recorded", report)
+        self.assertIn("verbose native console echo", report)
+        link_paths = re.findall(r"\]\(([^)]+)\)", report)
+        self.assertEqual(
+            set(link_paths),
+            {f"figures/{name}" for name in figures.FIGURE_FILES}
+            | {"calibration_bins.csv"},
+        )
+        self.assertTrue(all((output / link).is_file() for link in link_paths))
+
+    def test_tabicl_runtime_points_preserve_missing_and_zero_durations(self):
+        for spec in self.manifest["runs"]:
+            metadata_path = self.run_dir(spec["role"]) / "metadata.json"
+            metadata = self.read_json(metadata_path)
+            metadata["prediction_duration_seconds"]["source"] = 0
+            metadata["prediction_duration_seconds"]["kaggle"] = None
+            _write_json(metadata_path, metadata)
+        runs, _ = self.validate()
+        points = figures.runtime_points(runs, self.manifest)
+        self.assertTrue(any(point["duration_seconds"] == 0 for point in points))
+        self.assertTrue(any(point["duration_seconds"] is None for point in points))
+
+    def test_legacy_csv_output_contract_and_values_remain_unchanged(self):
+        legacy_root = self.root / "legacy"
+        legacy_manifest, legacy_path = fixture(legacy_root)
+        with (
+            patch.object(validation, "PROJECT_ROOT", legacy_root),
+            patch.object(validation, "RESULTS_DIR", legacy_root / "results"),
+        ):
+            runs, _ = validation.validate_comparison(legacy_manifest, legacy_path)
+            rendered = tables.generate_tables(runs, legacy_manifest)
+        metric_rows = list(csv.DictReader(rendered["metrics.csv"].splitlines()))
+        self.assertEqual(
+            list(metric_rows[0]),
+            [
+                "run_id", "model", "train_domain_id", "train_domain_label",
+                "evaluation_domain_id", "evaluation_domain_label", "feature_set",
+                "training_budget", "model_seed", "sampling_seed", "threshold",
+                "prediction_batch_size", "test_sample_size", "positive_count",
+                "positive_prevalence", "roc_auc", "average_precision", "f1", "brier_score",
+            ],
+        )
+        first_metric = next(csv.DictReader(rendered["metrics.csv"].splitlines()))
+        self.assertEqual(first_metric["model"], "catboost")
+        self.assertEqual(first_metric["train_domain_id"], "source")
+        self.assertEqual(first_metric["evaluation_domain_id"], "source")
+        self.assertEqual(first_metric["training_budget"], "2000")
+        self.assertEqual(first_metric["roc_auc"], "0.375")
+        differences = next(csv.DictReader(rendered["metric_differences.csv"].splitlines()))
+        self.assertEqual(differences["tabpfn_minus_catboost_roc_auc"], "0.625")
+        self.assertNotIn("candidate_minus_baseline_roc_auc", differences)
 
 
 if __name__ == "__main__":

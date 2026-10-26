@@ -15,7 +15,12 @@ TabICL uses the explicit none-normalization, uncached FP32 profile with eight en
 | Playground S5E12 | TabPFN | 0.648997 | 0.698164 | 0.780870 |
 | Playground S5E12 | TabICL | 0.650522 | 0.687861 | 0.781324 |
 
-## NHANES ranking and probability quality
+Ranking performance (ROC-AUC and average precision), classification performance
+at the fixed threshold (F1), and probability quality (Brier score) measure
+different aspects of prediction. Brier score describes overall probability
+accuracy, not calibration alone.
+
+## NHANES ranking, classification, and probability quality
 
 | Training domain | Model | ROC-AUC | Average precision | F1 at 0.5 | Brier (lower better) |
 |---|---|---:|---:|---:|---:|
@@ -42,4 +47,13 @@ Both TabICL runs completed without detected native recovery or swap. Allocator p
 - [tabicl_v2_source_strict_common_16_n2000_none_fp32_uncached_seed42](../results/predictive/tabicl_v2_source_strict_common_16_n2000_none_fp32_uncached_seed42/metadata.json): completed `2026-10-26T04:07:31.465085+00:00`; ordered training hash `7d81147cce93cd5c56b2e66484f9f8902ae4ef1784bab270c32016e43f44d170`.
 - [tabicl_v2_kaggle_strict_common_16_n2000_none_fp32_uncached_seed42](../results/predictive/tabicl_v2_kaggle_strict_common_16_n2000_none_fp32_uncached_seed42/metadata.json): completed `2026-10-26T04:41:07.295576+00:00`; ordered training hash `612fcfb9dae65a36b591f44065baef3cf629b028435737db4a5480b09469fe3b`.
 
-The existing comparison report still selects only CatBoost/TabPFN. Extending its validated manifest/plots to include TabICL is E04; this review does not replace that implementation.
+The integrated E04 comparison report now includes all six selected CatBoost,
+TabPFN, and TabICLv2 runs, the four declared candidate-versus-CatBoost
+comparisons, calibration support, runtime presentation, and three-model
+figures. It is generated from these saved artifacts only; it does not retrain,
+load checkpoints, or run inference. See the
+[validated report](../results/reports/predictive_n2000_seed42_with_tabicl_figures_final/report.md)
+and its [validation record](../results/reports/predictive_n2000_seed42_with_tabicl_figures_final/validation.json).
+The figures are single-seed descriptive views, not significance or uncertainty
+estimates. Completed TabICLv2 runs included verbose native console echo; the
+later quiet-console logging change was not measured, so no speedup is inferred.

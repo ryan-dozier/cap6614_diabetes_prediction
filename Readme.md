@@ -24,8 +24,8 @@ Status as of 2026-10-26:
 | Matched Original Synthetic n2000 CatBoost and float32 TabPFN evaluations | Completed |
 | Original Synthetic and Playground S5E12 validation-only TabPFN benchmarks | Completed; batch 1024 selected among tested settings |
 | Matched Playground S5E12 n2000 CatBoost and float32 TabPFN batch-1024 evaluations | Completed |
-| Predictive comparison reporting | Completed for four matched CatBoost/TabPFN runs: validated tables and performance, calibration, and runtime figures |
-| TabICL | Adapter, local checks, and both matched n2000 none/FP32 predictive runs complete (M07/M08); reporting integration pending (E04) |
+| Predictive comparison reporting | Legacy four-run CatBoost/TabPFN tables and figures remain supported; six-run CatBoost/TabPFN/TabICLv2 tables and figures are implemented and validated (E04) |
+| TabICL | Adapter, local checks, both matched n2000 none/FP32 predictive runs, and three-model comparison reporting complete (M07/M08/E04) |
 | FT-Transformer | Not implemented |
 
 Matched n2000 CatBoost and float32 TabPFN results for both synthetic domains are complete. The Playground S5E12 results are in `results/predictive/catboost_kaggle_strict_common_16_n2000_seed42/` and `results/predictive/tabpfn_v35_kaggle_strict_common_16_n2000_float32_seed42_batch1024/`. The Original Synthetic batch-256 predictive results are complete and remain valid; rerunning them at batch 1024 is optional and only for a runtime comparison. Benchmark measurements are computational results, not additional predictive evaluations.
@@ -282,16 +282,51 @@ Choose a new `output_dir` in the JSON configuration for every rerun. Outputs:
 
 #### Fixed-seed predictive comparison report
 
-The first artifact-based comparison report uses the explicit, versioned
-selection in `configs/reports/predictive_n2000_seed42.json`. It validates the
-four matched n=2,000 CatBoost/TabPFN runs, their saved identities, labels,
-fingerprints, metrics, calibration bins, and evaluation populations across all
-four runs, then writes CSV and Markdown tables. `validation.json` distinguishes
-input-validation from report-generation status; `manifest.json` records consumed
-artifact hashes, reporting package versions, and available Git revision/dirty
-state. It reads saved artifacts only: it does not train, load checkpoints, or
-run inference. Bootstrap intervals, multi-seed aggregation, and full-data
-reference comparisons are not implemented.
+The legacy artifact-based report uses the explicit, versioned selection in
+`configs/reports/predictive_n2000_seed42.json`. It continues to validate the
+four matched n=2,000 CatBoost/TabPFN runs and supports both tables-only and
+figure-enabled workflows. Its schema-version-1 CSV columns and meanings are
+preserved.
+
+The new
+`configs/reports/predictive_n2000_seed42_with_tabicl.json` manifest selects six
+completed runs explicitly (schema version 2). It
+compares each TabPFN and TabICL run with the CatBoost baseline in its training
+domain—four declared comparisons total—and validates training identity
+sequences, evaluation populations and labels, saved profiles, and
+prediction-derived metrics. Its metric differences use generic
+`candidate_minus_baseline_*` names; it does not add TabICL-versus-TabPFN pairs.
+`validation.json` and `manifest.json` record schema versions, input validation
+and report-generation status, run/input hashes, declared comparisons, reporting
+versions, and available Git provenance.
+
+The schema-version-2 report supports both tables-only and `--with-figures`
+workflows. Its figure set contains ROC-AUC, average-precision, and Brier-score
+comparisons, six training/evaluation reliability panels, grouped calibration-bin
+support, and prediction runtimes (each PNG and PDF). Reliability plots omit
+empty bins, while support plots retain their zero counts; common calibration
+bin boundaries are validated before plotting. The report distinguishes ranking
+performance (ROC-AUC and average precision), fixed-threshold classification
+performance (F1), and overall probability quality (Brier score). Runtime
+presentation separates timings from device/profile/resource details; memory
+units in the report are human-readable while `runtime.csv` retains bytes.
+
+The profiles intentionally differ: CatBoost uses same-domain validation for
+early stopping on CPU; TabPFN and TabICL use training context only and execute
+on CUDA. TabPFN is v3.5 float32 with four estimators and query batches 256
+(Original Synthetic) / 1024 (Playground S5E12). TabICL uses the experimental
+TabICLv2 none-normalization, uncached FP32 profile, eight estimators, native
+ensemble batch size 1, CPU column-output storage, and external query batch 128.
+These matched row budgets do not make the methods compute-matched; pretraining,
+validation access, ensemble design, device, and runtime are confounders. The
+TabICL none-normalization profile differs from its vendor-default normalization
+ensemble.
+
+Both workflows read saved artifacts only: they do not train, load checkpoints,
+or run inference. The completed TabICLv2 runs included verbose native console
+echo; the later quiet-console logging change was not measured in those runs, so
+no speedup is inferred. Bootstrap intervals, multi-seed aggregation, and
+full-data reference comparisons are not implemented.
 
 From the project root, choose a fresh output directory for each invocation.
 The default is tables-only and does not import Matplotlib:
@@ -302,13 +337,22 @@ python3 -m src.reporting.compare_predictive \
   --output-dir results/reports/predictive_n2000_seed42_tables
 ```
 
-Add `--with-figures` to generate descriptive performance, reliability/bin
-support, and prediction-runtime charts, each as PNG and PDF:
+The six-run schema-version-2 tables-only report uses the separate manifest and
+a fresh output directory:
 
 ```bash
 python3 -m src.reporting.compare_predictive \
-  --manifest configs/reports/predictive_n2000_seed42.json \
-  --output-dir results/reports/predictive_n2000_seed42_figures \
+  --manifest configs/reports/predictive_n2000_seed42_with_tabicl.json \
+  --output-dir results/reports/predictive_n2000_seed42_with_tabicl_tables
+```
+
+Generate the integrated three-model report with figures (use a new output
+directory for each run):
+
+```bash
+python3 -m src.reporting.compare_predictive \
+  --manifest configs/reports/predictive_n2000_seed42_with_tabicl.json \
+  --output-dir results/reports/predictive_n2000_seed42_with_tabicl_figures_final \
   --with-figures
 ```
 
@@ -319,7 +363,9 @@ by recency or score. Reports contain `metrics.csv`,
 include a `figures/` directory with metric, reliability, bin-support, and
 runtime plots. The report manifest records figure selection, generated
 filenames, Matplotlib version when applicable, consumed artifact hashes,
-reporting package versions, and available Git provenance.
+reporting package versions, and available Git provenance. All required files
+must be nonempty and report-relative links must resolve before completion is
+recorded; failed generation retains a failure diagnostic.
 
 Output paths resolve from the project root and must be new directories under
 `results/reports/`. Existing output paths and paths overlapping input runs are
@@ -726,7 +772,9 @@ Equal ensemble counts across model families do not imply equal compute.
 See [the result comparison and runtime review](docs/tabicl_predictive_results.md).
 Existing output directories are protected; repeating these runs requires new
 experiment/output names. The current reporting manifest still selects only
-CatBoost/TabPFN; TabICL report integration is tracked as E04.
+CatBoost/TabPFN for the legacy figure-enabled workflow. E04 adds the separate
+schema-version-2 report with both TabICLv2 runs, paired CatBoost comparisons,
+and validated three-model figures.
 Each command evaluates all three full test domains: Original Synthetic,
 Playground S5E12 and NHANES 2015–2016. Do not substitute these commands for
 validation-only smoke checks:

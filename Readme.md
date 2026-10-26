@@ -1,6 +1,6 @@
 # Synthetic Tabular Data Under Distribution Shift
 
-This project studies how diabetes-prediction models trained on synthetic tabular data generalize across synthetic generators and to real survey data. **Original Synthetic: the 100,000-row Diabetes Health Indicators Dataset published on Kaggle by Mohan Krishna Thalla.** This is a descriptive project label, not an independently verified claim about original authorship or the complete generation history. Original Synthetic and Playground S5E12 are both synthetic; NHANES 2015–2016 is real survey data. CatBoost is the reference model, and pretrained TabPFN provides the current tabular foundation-model comparison.
+This project studies how diabetes-prediction models trained on synthetic tabular data generalize across synthetic generators and to real survey data. **Original Synthetic: the 100,000-row Diabetes Health Indicators Dataset published on Kaggle by Mohan Krishna Thalla.** This is a descriptive project label, not an independently verified claim about original authorship or the complete generation history. Original Synthetic and Playground S5E12 are both synthetic; NHANES 2015–2016 is real survey data. CatBoost is the reference model. Pretrained TabPFN provides completed foundation-model comparisons; TabICLv2 is integrated and locally validated, with its full predictive comparisons pending (M08).
 
 | Internal ID | Display name | Dataset |
 |---|---|---|
@@ -9,6 +9,8 @@ This project studies how diabetes-prediction models trained on synthetic tabular
 | `nhanes` | NHANES 2015–2016 | National Health and Nutrition Examination Survey |
 
 Both synthetic datasets are hosted on Kaggle; the internal ID `kaggle` specifically means Playground S5E12. The downloaded Original Synthetic `diabetes_dataset.csv` exactly matches the local CSV (SHA-256 below).
+
+See [the project checklist and contribution record](PROJECT_CHECKLIST.md) for checkable tasks, ownership, implementation evidence, and remaining research work.
 
 ## Current Status
 
@@ -22,6 +24,7 @@ Status as of 2026-10-25:
 | Matched Original Synthetic n2000 CatBoost and float32 TabPFN evaluations | Completed |
 | Original Synthetic and Playground S5E12 validation-only TabPFN benchmarks | Completed; batch 1024 selected among tested settings |
 | Matched Playground S5E12 n2000 CatBoost and float32 TabPFN batch-1024 evaluations | Completed |
+| Predictive comparison reporting | Completed for four matched CatBoost/TabPFN runs: validated tables and performance, calibration, and runtime figures |
 | TabICL | Adapter and bounded none/FP32 local checks complete for both n2000 contexts; full predictive runs pending (M08) |
 | FT-Transformer | Not implemented |
 
@@ -267,8 +270,12 @@ Choose a new `output_dir` in the JSON configuration for every rerun. Outputs:
 - `metrics.json`, `metrics.csv`, and `calibration_bins.csv`: per-domain evaluation.
 - `predictions_<domain>_test.csv.gz`: authoritative row indices (and NHANES
   `seqn`) as provenance, labels, positive-class probabilities, and predictions.
-- `model.cbm`: the single fitted CatBoost model in native format (TabPFN uses
-  the fitted-state artifacts described below).
+- `model.cbm`: the fitted CatBoost model in native format.
+- `model.tabpfn_fit` and `model.adapter.json`: TabPFN fitted state and adapter
+  sidecar; restoration requires the original checkpoint and supported runtime.
+- `model.tabicl_fit` and `model.adapter.json`: TabICL fitted state with embedded
+  weights/context and adapter sidecar; the supported restore policy requires
+  trusted artifacts and the same saved device and dependency versions.
 - `training_sample.csv.gz`: actual training context, with domain, `train` split,
   authoritative identifiers, and zero-based `sample_order` (also emitted for
   full-data runs).

@@ -1,0 +1,158 @@
+# Project checklist and contribution record
+
+Last reviewed: 2026-10-25.
+
+## How to use this checklist
+
+- Check a task only when its acceptance criteria are satisfied and evidence is linked.
+- Status values: Not started, In progress, Implemented, Validated, Merged, Complete, Deferred.
+- A checked implementation task does not imply its PR has merged or its research question is resolved.
+- Owner is the person responsible for the next action; Implemented by records actual contributors. Record experiment execution, analysis, and writing contributions as well as code.
+- Completed work is attributed to **Ryan Dozier (ryan-dozier)** based on local Git authorship and your statement that you have been the only contributor. Git records both names for the same author identity. Experiment execution attribution also relies on your supplied run logs; Git alone does not establish who ran an experiment. Review attribution is based on your confirmation that you performed the reviews; it is recorded as self-review. AI assistance is not a separate team-member contribution.
+- Assign pending work before beginning it. Record reviewer and PR/commit/report links when available.
+- Preserve raw data, fixed split assignments, and completed experiment artifacts. New experiments and reports use distinct output directories.
+
+Task record template:
+
+```text
+Owner: Unassigned
+Implemented by: —
+Reviewed by: —
+Status: Not started
+Evidence: PR/commit, command/config, result directory, or document section
+Completed on: —
+```
+
+## Scope and requirements
+
+This checklist combines the course requirements pasted into the project conversation, the original project handoff, the current README/code, and saved experiment metadata. The original proposal PDF was unavailable at its previously supplied Downloads path during this review; reconciling it is an open task. A task not verified here is not necessarily work nobody has done.
+
+Course expectations include a clear research question, related work, credible baselines, a potentially novel idea, rigorous experiments and ablations, a connection to current AI course topics, and identifiable, reasonably balanced team contributions. Recommended team size is 4–5, not a confirmed mandatory team-size rule. Publication is an optional extension, not a promised outcome.
+
+Project scope: synthetic-to-synthetic generalization between Original Synthetic and Playground S5E12, synthetic-to-real evaluation on NHANES, and few-shot adaptation using real training data. TabPFN connects the implemented work to pretrained tabular foundation models. TabICL and FT-Transformer remain planned; SAINT is optional.
+
+| Internal ID | Display name | Role |
+|---|---|---|
+| source | Original Synthetic | 100,000-row synthetic Diabetes Health Indicators dataset |
+| kaggle | Playground S5E12 | 700,000-row synthetic competition training dataset |
+| nhanes | NHANES 2015–2016 | Real survey evaluation/adaptation domain |
+
+## 1. Research design and course alignment
+
+- [x] **R01 — Establish the research setting and primary domains.** Status: Complete. Implemented by: Ryan Dozier. Evidence: [README](Readme.md), original handoff. Both synthetic domains are distinguished from NHANES.
+- [x] **R02 — Freeze primary features and splits.** Status: Complete. Implemented by: Ryan Dozier. Evidence: preparation scripts and processed metadata. Primary features: strict_common_16; participant-based NHANES splits.
+- [ ] **R03 — Reconcile this checklist with the actual proposal and submission rubric.** Owner: Unassigned. Implemented by: —. Done when deliverables, deadlines, proposal commitments, and any grading-specific requirements are recorded from the supplied documents.
+- [ ] **R04 — Write explicit research questions and hypotheses.** Owner: Unassigned. Implemented by: —. Cover generator shift, real-domain ranking/calibration, and adaptation; define success criteria before additional experiments.
+- [ ] **R05 — Complete related-work review and bibliography.** Owner: Unassigned. Implemented by: —. Compare tabular foundation models, neural tabular methods, synthetic-data artifacts, transfer/adaptation, and calibration. Explain the gap this project addresses.
+- [ ] **R06 — Define the potentially novel contribution.** Owner: Unassigned. Implemented by: —. Specify one testable idea, its motivating hypothesis, baseline, and component ablations. Candidate directions include artifact-aware context/feature selection or adaptation; choose based on related work and training/validation evidence. Model benchmarking alone must not be presented as established novelty.
+- [ ] **R07 — Define team responsibilities and contribution tracking.** Owner: Unassigned. Implemented by: —. Confirm actual team size and assign balanced, identifiable implementation, experiment, analysis, and writing work.
+
+## 2. Data and reproducibility foundation
+
+- [x] **D01 — Prepare Original Synthetic and Playground datasets.** Status: Complete. Implemented by: Ryan Dozier. Evidence: scripts/prepare_data.py; data/processed/metadata.json; data/splits/.
+- [x] **D02 — Download, inspect, and harmonize NHANES.** Status: Complete. Implemented by: Ryan Dozier. Evidence: scripts/prepare_nhanes.py; results/nhanes_preparation/; results/nhanes_inspection/.
+- [x] **D03 — Prepare strict_common_16, common_20, and common_22 cohorts.** Status: Complete. Implemented by: Ryan Dozier. Feature-set preparation is complete; sensitivity experiments are not.
+- [x] **D04 — Implement the shared data gateway and identifier exclusion.** Status: Complete. Implemented by: Ryan Dozier. Evidence: src/data.py. No learned preprocessing in canonical data; model-specific transforms fit only on training data.
+- [x] **D05 — Verify Original Synthetic file provenance.** Status: Complete. Implemented by: Ryan Dozier. Evidence: README acquisition section. Kaggle mohankrishnathalla/diabetes-health-indicators-dataset CSV matches local SHA-256 72ced87cdffdbc2dd594aa214a11c3561498200980def2958e2610413eb29bef. Exact file identity does not establish every upstream generation step.
+- [x] **D06 — Organize packages, paths, setup, and display labels.** Status: Complete. Implemented by: Ryan Dozier. Evidence: src/paths.py, src/domain_labels.py, scripts/, README. Internal IDs remain stable.
+- [ ] **D07 — Finish the data provenance/license and measurement appendix.** Owner: Unassigned. Implemented by: —. Record citations, verified access/license conditions, available versions/dates, feature mappings, target definitions, cohort exclusions, and limits of cross-domain comparability. Reuse existing audits rather than rebuilding preparation.
+- [ ] **D08 — Verify reproduction from a clean environment.** Owner: Unassigned. Implemented by: —. Document dependency/checkpoint requirements and reproduce a small authorized smoke/report workflow without relying on undocumented local files.
+
+## 3. Completed distribution-shift diagnostics
+
+- [x] **S01 — Train the balanced synthetic-domain classifier.** Status: Complete. Implemented by: Ryan Dozier. Evidence: results/domain_classifier/.
+- [x] **S02 — Quantify numeric/categorical shift and feature-importance associations.** Status: Complete. Implemented by: Ryan Dozier. Evidence: results/distribution_shift/.
+- [x] **S03 — Run domain-feature removal ablations.** Status: Complete. Implemented by: Ryan Dozier. Evidence: results/domain_feature_ablation/. These measure domain distinguishability, not downstream diabetes-transfer improvement.
+- [x] **S04 — Compare harmonized synthetic and NHANES domains.** Status: Complete. Implemented by: Ryan Dozier. Evidence: results/harmonized_domain_comparison/.
+
+## 4. Predictive infrastructure and initial experiments
+
+- [x] **M01 — Build shared model/experiment interfaces.** Status: Complete. Implemented by: Ryan Dozier. Evidence: src/models/base.py; src/experiments/. Includes configuration, metrics, persistence, provenance, timing, and failure handling.
+- [x] **M02 — Add deterministic matched-budget sampling.** Status: Complete. Implemented by: Ryan Dozier. Evidence: src/experiments/sampling.py; sampling tests. Matching models use identical rows and order within each training domain.
+- [x] **M03 — Implement CatBoost and full-data reference runs.** Status: Complete. Implemented by: Ryan Dozier. Evidence: src/models/catboost.py and both full-data CatBoost result directories.
+- [x] **M04 — Implement local TabPFN and precision/persistence smoke checks.** Status: Complete. Implemented by: Ryan Dozier. Evidence: src/models/tabpfn.py; src/experiments/smoke_tabpfn.py; results/smoke/.
+- [x] **M05 — Complete all four matched n2000, seed-42 predictive runs.** Status: Complete. Implemented by: Ryan Dozier. Evidence: six-domain-pair comparisons in the reviewed report. Each of four models evaluates all three domains.
+- [x] **M06 — Benchmark TabPFN batch sizes using validation queries.** Status: Complete. Implemented by: Ryan Dozier. Evidence: results/benchmarks/. Batch 1024 selected among tested settings; no test-metric-based selection.
+- [ ] **M07 — Implement TabICL adapter and local feasibility checks.** Owner: Unassigned. Implemented by: —. Verify installed API/checkpoint, train-only context/preprocessing, prediction batching, persistence as supported, compute requirements, and failure behavior. Add focused tests.
+- [ ] **M08 — Run both matched TabICL n2000 experiments.** Owner: Unassigned. Implemented by: —. Depends on M07. Use matching training samples, frozen evaluation splits, and explicit compute settings; validate and report outputs.
+- [ ] **M09 — Implement FT-Transformer training.** Owner: Unassigned. Implemented by: —. Define train-only numeric/categorical preprocessing, unseen-category handling, validation-based selection, budget, persistence, and reproducibility. Add focused tests.
+- [ ] **M10 — Run FT-Transformer comparisons.** Owner: Unassigned. Implemented by: —. Depends on M09. Define matched-budget and any larger-budget groups explicitly; do not silently combine them.
+- [ ] **M11 — Decide whether SAINT adds enough value to implement.** Owner: Unassigned. Implemented by: —. Optional; may be marked Deferred with rationale. Do not let this delay the central contribution.
+
+### Verified initial run matrix
+
+| Training domain | Model | Training rows | Prediction batch | Status | Implemented/run by |
+|---|---|---:|---:|---|---|
+| Original Synthetic | CatBoost | Full training split | See config | Completed | Ryan Dozier |
+| Playground S5E12 | CatBoost | Full training split | See config | Completed | Ryan Dozier |
+| Original Synthetic | CatBoost | 2,000 | 256 | Completed | Ryan Dozier |
+| Original Synthetic | TabPFN float32 | 2,000 | 256 | Completed | Ryan Dozier |
+| Playground S5E12 | CatBoost | 2,000 | 256 | Completed | Ryan Dozier |
+| Playground S5E12 | TabPFN float32 | 2,000 | 1024 | Completed | Ryan Dozier |
+
+All rows evaluate Original Synthetic, Playground S5E12, and NHANES. A rerun of Original Synthetic TabPFN at batch 1024 is optional, not required to retain its valid predictive results.
+
+## 5. Reporting and statistical evidence
+
+- [x] **E01 — Implement validated report loading and comparison tables.** Status: Merged and validated. Implemented by: Ryan Dozier. Evidence: src/reporting/; configs/reports/predictive_n2000_seed42.json. Checks training samples, thresholds, evaluation identities/labels, hashes, and recomputed metrics.
+- [x] **E02 — Implement performance, calibration, and runtime figures.** Status: Merged and validated. Implemented by: Ryan Dozier. Evidence: results/reports/predictive_n2000_seed42_with_figures_reviewed/. Contains 12 metric rows, six paired differences, four runtime rows, 120 calibration rows, and six PNG/PDF pairs. Nine cross-run population checks passed. Last reported suite: 87 tests passed.
+- [x] **E03 — Record reporting-feature merge evidence.** Status: Merged. Implemented by: Ryan Dozier. Evidence: [PR #3](https://github.com/ryan-dozier/cap6614_diabetes_prediction/pull/3), implementation eb072c3, merge 1fe3c7d on 2026-10-25. Local Git history confirms the merge; reviewed by Ryan Dozier (self-review), per contributor confirmation.
+- [ ] **E04 — Extend reporting for additional models and experiment groups.** Owner: Unassigned. Implemented by: —. Current report targets four specific CatBoost/TabPFN runs. Extend intentionally when TabICL/FT-Transformer results exist; preserve matching and identity validation.
+- [ ] **E05 — Predefine uncertainty and repeat-run protocol.** Owner: Unassigned. Implemented by: —. Specify model/sampling seeds, paired comparisons, and uncertainty method. Distinguish training randomness from finite-test-sample uncertainty; account for NHANES survey structure if making survey-population claims.
+- [ ] **E06 — Execute repeat runs and uncertainty analysis.** Owner: Unassigned. Implemented by: —. Depends on E05. Report variability and limitations; do not treat a single seed as proof of superiority.
+- [ ] **E07 — Write model reliance and failure analysis.** Owner: Unassigned. Implemented by: —. Explain ranking versus calibration, class-prevalence shift, sparse bins, and measurement limitations. Diagnostic test findings must not become undeclared test-based tuning.
+
+## 6. Core research extensions
+
+- [ ] **X01 — Specify few-shot NHANES adaptation protocol.** Owner: Unassigned. Implemented by: —. Define 0%, 1%, 5%, 10%, 25%, 50%, and 100% budgets as exact counts from NHANES train, subject to feasibility. Specify sampling/repeats, nested subsets if used, class coverage, and how validation labels count toward the real-label budget. Keep test participants fixed and unused for selection.
+- [ ] **X02 — Implement adaptation and comparison baselines.** Owner: Unassigned. Implemented by: —. Depends on X01. Specify model-appropriate adaptation, synthetic-only zero-shot, and real-only baselines; do not assume every model is fine-tuned the same way. Record synthetic/real context allocation.
+- [ ] **X03 — Run adaptation learning curves.** Owner: Unassigned. Implemented by: —. Depends on X02 and E05. Compare equal real-label budgets with repeat sampling and uncertainty. Keep calibration-only versus model-adaptation interventions identifiable.
+- [ ] **X04 — Implement and evaluate the chosen contribution.** Owner: Unassigned. Implemented by: —. Depends on R06. Compare against credible alternatives, equal budgets, and an explicitly defined selection policy. Novelty remains a claim to justify through related work.
+- [ ] **X05 — Run predictive artifact-aware feature ablations.** Owner: Unassigned. Implemented by: —. Evaluate diabetes prediction and cross-domain transfer, not just domain classification. Fix rankings using permitted training/validation data; avoid selecting features from test performance.
+- [ ] **X06 — Run common_20 sensitivity experiments.** Owner: Unassigned. Implemented by: —. Preserve participant split membership. Separate effects of added approximate mappings from changes in eligible cohort, using a common-participant comparison where appropriate.
+- [ ] **X07 — Run common_22 fasting-lipid sensitivity experiments.** Owner: Unassigned. Implemented by: —. Account for the smaller fasting cohort, fixed participant splits, and cohort-selection effects; do not attribute all changes to lipid features.
+- [ ] **X08 — Complete component ablations for the proposed method.** Owner: Unassigned. Implemented by: —. Depends on X04. Isolate which components produce the observed effect and include negative findings.
+
+## 7. Final deliverables and teamwork
+
+- [ ] **F01 — Produce the final experiment inventory.** Owner: Unassigned. Implemented by: —. Every included result links to config, input provenance, code revision, and completed output; exploratory and confirmatory results are distinguished.
+- [ ] **F02 — Write the technical report.** Owner: Unassigned. Implemented by: —. Include problem, related work, data/protocol, contribution, baselines, experiments, ablations, uncertainty, limitations, and citations.
+- [ ] **F03 — Prepare and rehearse the presentation.** Owner: Unassigned. Implemented by: —. Explain the research question, method, key figures, limitations, and each member's contribution. Follow the confirmed rubric and timing.
+- [ ] **F04 — Finalize reproducible code and documentation.** Owner: Unassigned. Implemented by: —. Clean setup instructions, data/checkpoint acquisition, commands, tests, release/version reference, and accessible result summaries without committing large/private artifacts.
+- [ ] **F05 — Complete the contribution statement.** Owner: Unassigned. Implemented by: —. List actual work by each member, including analysis, execution, writing, and review, with supporting PRs or document history.
+- [ ] **F06 — Audit submission against course requirements.** Owner: Unassigned. Implemented by: —. Confirm required files, formatting, deadline, contribution evidence, and access permissions.
+- [ ] **F07 — Consider a workshop/conference extension.** Owner: Unassigned. Implemented by: —. Optional; only after course deliverables and sufficient evidence. Publication is not guaranteed.
+
+## Immediate next actions
+
+1. Keep the contribution log current as tasks are completed. Existing reviews are attributed to Ryan Dozier (self-review); reporting PR #3 is confirmed merged.
+2. Reconcile proposal/rubric and assign owners (R03, R07).
+3. Implement TabICL feasibility and adapter work (M07), followed by matched runs (M08).
+4. In parallel with model development, finish related work and define the contribution/adaptation protocol (R05, R06, X01).
+5. Correct the README status paragraph: only Playground TabPFN used batch 1024 in the completed predictive matrix; Original Synthetic used 256. Add reporting and remaining research work to the status overview.
+
+## Contribution log
+
+Populated from local Git history, saved run metadata, and the contributor's execution logs. Dates below explicitly distinguish implementation commits, merges, and experiment completion; a commit date is not proof that all related experiments finished that day. Ryan Dozier confirmed performing all reviews to date; these are recorded as self-review, with AI assistance where noted. PR authorship or merge alone is not the basis for that attribution.
+
+Repository: [ryan-dozier/cap6614_diabetes_prediction](https://github.com/ryan-dozier/cap6614_diabetes_prediction).
+
+| Task ID | Contribution | Implemented/performed by | Reviewed by | PR/commit/report | Date and basis |
+|---|---|---|---|---|---|
+| D01, D04 | Initial synthetic data preparation, fixed splits, and shared loader | Ryan Dozier | Ryan Dozier (self-review) | [0e6f859](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/0e6f859) | 2026-10-18 implementation commit |
+| S01, S02 | Balanced domain classifier and statistical distribution-shift analysis | Ryan Dozier | Ryan Dozier (self-review) | [0e6f859](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/0e6f859); results/domain_classifier/; results/distribution_shift/ | 2026-10-18 implementation commit; run date not established here |
+| S03 | Domain-feature removal ablation analysis | Ryan Dozier | Ryan Dozier (self-review) | [664a471](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/664a471); results/domain_feature_ablation/ | 2026-10-19 implementation commit |
+| D06 | Environment snapshot and initial setup workflow | Ryan Dozier | Ryan Dozier (self-review) | [1019bff](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/1019bff), [a9e8b82](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/a9e8b82) | 2026-10-19 implementation commits |
+| D02, D03, R02, S04 | NHANES download/inspection, harmonization, feature cohorts, loader integration, and cross-domain comparison | Ryan Dozier | Ryan Dozier (self-review) | [760a570](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/760a570); results/nhanes_preparation/; results/harmonized_domain_comparison/ | 2026-10-19 implementation commit |
+| D06 | Package reorganization and shared path definitions | Ryan Dozier | Ryan Dozier (self-review) | [ed4200d](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/ed4200d) | 2026-10-21 implementation commit |
+| M01, M03 | Shared predictive framework, CatBoost adapter, configuration, metrics, persistence, and tests | Ryan Dozier | Ryan Dozier (self-review) | [6b3d17c](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/6b3d17c) | 2026-10-23 implementation commit |
+| M03 | Execute full-data CatBoost evaluations from both synthetic training domains | Ryan Dozier (execution logs) | Ryan Dozier (self-review) | results/predictive/catboost_source_strict_common_16_seed42/; results/predictive/catboost_kaggle_strict_common_16_seed42/ | 2026-10-23 completed-run metadata |
+| M02, M04 | Deterministic matched sampling, TabPFN adapter, float32 smoke/persistence checks, and tests | Ryan Dozier | Ryan Dozier (self-review) | [f927ace](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/f927ace) | 2026-10-24 implementation commit; some runs predate commit |
+| M05 | Execute Original Synthetic n2000 CatBoost and TabPFN comparisons | Ryan Dozier (execution logs) | Ryan Dozier (self-review) | results/predictive/catboost_source_strict_common_16_n2000_seed42/; results/predictive/tabpfn_v35_source_strict_common_16_n2000_float32_seed42/ | 2026-10-23 completed-run metadata |
+| M06 | Validation-only inference benchmarking, Source/Playground benchmark runs, and batch-1024 configs | Ryan Dozier | Ryan Dozier (self-review) | [PR #1](https://github.com/ryan-dozier/cap6614_diabetes_prediction/pull/1); [318a83a](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/318a83a); merge 0e35652; results/benchmarks/ | 2026-10-25 merge; benchmark runs also completed that day |
+| D05 | Verify Original Synthetic acquisition source by exact CSV hash and document provenance | Ryan Dozier (with AI-assisted verification) | Ryan Dozier (self-review) | README provenance section; local CSV hash recorded in D05 | 2026-10-25 verification in project conversation |
+| D06 | Central descriptive domain labels and user-facing terminology updates | Ryan Dozier | Ryan Dozier (self-review) | [PR #2](https://github.com/ryan-dozier/cap6614_diabetes_prediction/pull/2); [3a21831](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/3a21831); merge ccca207 | 2026-10-25 merge |
+| M05 | Execute Playground S5E12 n2000 CatBoost and TabPFN batch-1024 comparisons | Ryan Dozier (execution logs) | Ryan Dozier (self-review) | results/predictive/catboost_kaggle_strict_common_16_n2000_seed42/; results/predictive/tabpfn_v35_kaggle_strict_common_16_n2000_float32_seed42_batch1024/ | 2026-10-25 completed-run metadata |
+| E01, E02, E03 | Artifact validation, comparison tables, calibration/performance/runtime figures, reporting tests and documentation | Ryan Dozier | Ryan Dozier (self-review, AI-assisted) | [PR #3](https://github.com/ryan-dozier/cap6614_diabetes_prediction/pull/3); [eb072c3](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/eb072c3); merge 1fe3c7d; results/reports/predictive_n2000_seed42_with_figures_reviewed/ | 2026-10-25 merge |
+
+For future contributions, append a row and update the corresponding checklist task. Use separate rows when different people implement, execute, analyze, or document the same feature. Add verified reviewer names and PR links as they become available. Research planning/writing credit should be backed by document history rather than inferred solely from code commits.

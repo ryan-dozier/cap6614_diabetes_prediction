@@ -22,9 +22,10 @@ Status as of 2026-10-25:
 | Matched Original Synthetic n2000 CatBoost and float32 TabPFN evaluations | Completed |
 | Original Synthetic and Playground S5E12 validation-only TabPFN benchmarks | Completed; batch 1024 selected among tested settings |
 | Matched Playground S5E12 n2000 CatBoost and float32 TabPFN batch-1024 evaluations | Completed |
-| TabICL and FT-Transformer | Not implemented |
+| TabICL | Adapter and bounded none/FP32 local checks complete for both n2000 contexts; full predictive runs pending (M08) |
+| FT-Transformer | Not implemented |
 
-Matched n2000 CatBoost and float32 TabPFN batch-1024 results for both synthetic domains are complete. The Playground S5E12 results are in `results/predictive/catboost_kaggle_strict_common_16_n2000_seed42/` and `results/predictive/tabpfn_v35_kaggle_strict_common_16_n2000_float32_seed42_batch1024/`. The Original Synthetic batch-256 predictive results are complete and remain valid; rerunning them at batch 1024 is optional and only for a runtime comparison. Benchmark measurements are computational results, not additional predictive evaluations.
+Matched n2000 CatBoost and float32 TabPFN results for both synthetic domains are complete. The Playground S5E12 results are in `results/predictive/catboost_kaggle_strict_common_16_n2000_seed42/` and `results/predictive/tabpfn_v35_kaggle_strict_common_16_n2000_float32_seed42_batch1024/`. The Original Synthetic batch-256 predictive results are complete and remain valid; rerunning them at batch 1024 is optional and only for a runtime comparison. Benchmark measurements are computational results, not additional predictive evaluations.
 
 ## Environment Setup
 
@@ -53,7 +54,7 @@ python3 --version
 
 The Python version should be 3.11.x.
 
-The environment file includes both Conda-managed packages and the pip-installed Python dependencies required by the project, including PyTorch, TabPFN, CatBoost, pandas, SciPy, scikit-learn, and Matplotlib. You should not normally need to run `pip install -r requirements-local.txt` after creating the environment from `environment.yml`.
+The environment file includes both Conda-managed packages and the pip-installed Python dependencies required by the project, including PyTorch, TabPFN, TabICL 2.2.0, CatBoost, pandas, SciPy, scikit-learn, and Matplotlib. You should not normally need to run `pip install -r requirements-local.txt` after creating the environment from `environment.yml`.
 
 ### Pip Requirements
 
@@ -74,6 +75,7 @@ After activating the environment, the main dependencies can be checked with:
 ```bash
 python3 -c "import torch; print('PyTorch:', torch.__version__)"
 python3 -c "import tabpfn; print('TabPFN:', tabpfn.__version__)"
+python3 -c "from importlib.metadata import version; print('TabICL:', version('tabicl'))"
 python3 -c "import catboost; print('CatBoost:', catboost.__version__)"
 ```
 
@@ -227,7 +229,10 @@ The predictive framework evaluates robustness under synthetic generator shift
 (Original Synthetic and Playground S5E12 are **both synthetic**) and
 synthetic-to-real shift to NHANES 2015–2016.
 CatBoost is the reference adapter. Local pretrained TabPFN classification is also
-supported; TabICL and FT-Transformer are not implemented yet.
+supported for completed research runs. TabICL's explicit none/FP32 profile passed
+bounded train/validation-only local checks for both frozen n2000 contexts
+(see below); its full predictive runs remain pending (M08).
+FT-Transformer is not implemented.
 
 The first configuration fits **one** CatBoost model with seed 42 on Original
 Synthetic (`source`) `train`, using the same domain's `val` exclusively for
@@ -521,6 +526,201 @@ CatBoost and float32 TabPFN batch-1024 results are recorded in
 The completed Original Synthetic batch-256 predictive run remains valid; its
 batch-1024 rerun is optional and solely for runtime comparison. Batch-256 and
 autocast configurations are preserved.
+
+### TabICL: bounded experimental profile (M07)
+
+The TabICL adapter implements the explicit **`tabicl_v2_none_fp32_uncached`**
+experimental profile described in
+[the integration plan](docs/tabicl_integration_plan.md). `norm_methods=["none"]`
+is a project experiment choice, **not a universal requirement of TabICL**.
+It differs from TabICL 2.2.0's default `["none", "power"]` normalization views.
+Native train-fitted ordinal encoding, mean-imputer setup, constant-feature
+filtering, standard scaling and outlier clipping still apply. Canonical
+data are unchanged; categorical declarations are expressed by string dtypes on
+copied DataFrames. Validation is never used as model context or for fitting
+preprocessing. The adapter returns class-aware P(y=1), with the shared `>=0.5`
+threshold policy.
+
+The adapter, configuration/factory/environment hooks, native persistence,
+tests and train/validation-only smoke command are implemented. Both frozen
+n2000 contexts passed local correctness, persistence and resource gates;
+see [stage-3 results](docs/tabicl_stage3_results.md) for the four-run evidence
+and scope. **Full TabICL predictive runs remain pending (M08)**, not implied
+by local feasibility or configuration validation.
+
+The runtime requires exactly `tabicl==2.2.0`, pinned in both dependency files.
+No PyTorch/CUDA replacement or other package upgrade was needed. The default
+checkpoint filename alone is insufficient: the adapter
+requires the fixed revision, 110368038-byte size and SHA-256 below,
+checks the local file before native construction/fit, and always supplies
+`allow_auto_download=False`. It never downloads weights, selects an automatic
+device, retries with a different profile, or falls back to CPU model execution.
+
+#### Pinned checkpoint setup
+
+The public, ungated `jingang/TabICL` checkpoint is
+`tabicl-classifier-v2-20260212.ckpt` at revision
+`4dcd344ece2c00be9e831fdd35bed57b5ad83e19`, SHA-256
+`bdc7dbd5e4ff21f8f0456fcf90c6b7cdf72dbea960f2d05b19bec19f9b3d4ed0`.
+Code and checkpoint use BSD-3-Clause; see the
+[versioned license/access evidence and citations](docs/tabicl_integration_plan.md).
+Only this setup step requires network access. On a new machine, download only
+the pinned file if missing, then verify it before model construction. An
+existing mismatching file is an error, never silently overwritten:
+
+```bash
+HF_HUB_OFFLINE=0 conda run --no-capture-output -n synthetic-tabular-ai python - <<'PY'
+from pathlib import Path
+from huggingface_hub import hf_hub_download
+from src.models.tabicl import (
+    CHECKPOINT_FILENAME, CHECKPOINT_REVISION, CHECKPOINT_SHA256,
+    CHECKPOINT_SIZE, _sha256,
+)
+
+path = Path("checkpoints/tabicl") / CHECKPOINT_REVISION / CHECKPOINT_FILENAME
+if not path.exists():
+    hf_hub_download(
+        repo_id="jingang/TabICL", filename=CHECKPOINT_FILENAME,
+        revision=CHECKPOINT_REVISION, local_dir=path.parent, token=False,
+    )
+if path.stat().st_size != CHECKPOINT_SIZE or _sha256(path) != CHECKPOINT_SHA256:
+    raise RuntimeError(f"Checkpoint identity mismatch; preserved for inspection: {path}")
+print(f"Verified: {path}")
+PY
+```
+
+The resulting local path is
+`checkpoints/tabicl/4dcd344ece2c00be9e831fdd35bed57b5ad83e19/tabicl-classifier-v2-20260212.ckpt`.
+Checkpoints and all generated result/fitted-state/probability files stay out
+of Git. All inference and reload commands use `HF_HUB_OFFLINE=1`.
+
+The two **smoke-only** configurations are
+[Original Synthetic](configs/smoke/tabicl_v2_source_none_fp32.json) and
+[Playground S5E12](configs/smoke/tabicl_v2_kaggle_none_fp32.json). Their names,
+parameters and metadata identify the none/FP32 experiment explicitly.
+They use 8 TabICL ensemble members, native ensemble `batch_size=1`, external
+query batch 128, AMP/FA3/cache disabled, CUDA device 0, and requested CPU
+column-output storage. Native resource managers still choose internal splits
+and may recover from OOM or change output placement. Captured Python
+stdout/stderr/warnings are saved in `native_diagnostics.log` (and a separate
+reload log). **`no_recovery_detected` is not proof that no scheduling changes
+occurred.** Complete native scheduling is not exposed by a stable public API.
+The adapter restores the previous torch thread count even if prediction fails;
+do not run these adapters concurrently in one process.
+
+Tests and CLI inspection (no real-model inference):
+
+```bash
+HF_HUB_OFFLINE=1 conda run -n synthetic-tabular-ai python -m unittest \
+  discover -s tests -p 'test_tabicl*.py' -v
+conda run -n synthetic-tabular-ai python -m src.experiments.smoke_tabicl --help
+```
+
+The completed smoke runs are recorded in the stage-3 evidence document.
+If a future behavior change requires new evidence, use a **new** output directory:
+
+```bash
+# Small-context equivalence checks; repeat with the kaggle configuration.
+HF_HUB_OFFLINE=1 conda run --no-capture-output -n synthetic-tabular-ai python -m \
+  src.experiments.smoke_tabicl \
+  --config configs/smoke/tabicl_v2_source_none_fp32.json \
+  --output-dir results/smoke/tabicl_v2_source_n512_none_fp32_run02 \
+  --suite equivalence --sample-size 512 --query-size 65 --batch-size 128
+
+# Frozen n2000 context, equivalence and resource screening; repeat for kaggle.
+HF_HUB_OFFLINE=1 conda run --no-capture-output -n synthetic-tabular-ai python -m \
+  src.experiments.smoke_tabicl \
+  --config configs/smoke/tabicl_v2_source_none_fp32.json \
+  --output-dir results/smoke/tabicl_v2_source_n2000_none_fp32_run02 \
+  --suite feasibility --sample-size 2000 --query-size 257 --batch-size 128
+```
+
+Do not use the shared research runner with these smoke-only configurations:
+it evaluates test partitions. The smoke command loads only same-domain train
+and validation, stably selects identity-sorted validation queries without label
+selection, and computes no predictive metrics. Small checks use n512/65 queries;
+feasibility requires n2000/at least 257 queries, frozen training identity hashes
+and sequences, 128-row chunks, plus 2049 validation queries with warm-up and
+three timed repetitions. Equivalence checks include repetitions, query
+permutation, singleton/non-dividing chunks, sentinel composition, unseen
+categories, input nonmutation/schema rejection and fresh-process native reload.
+Existing output directories are refused; failures retain diagnostics and
+exit nonzero, without changing settings or relaxing acceptance criteria.
+
+The fixed FP32 comparison criterion is absolute difference
+`<= 7.62939453125e-6`, relative tolerance zero; native probability row sums
+must deviate from 1 by no more than `3.814697265625e-6`. These epsilon multipliers
+are **engineering acceptance criteria, not mathematically guaranteed error
+bounds**. No CLI tolerance overrides exist. All threshold flips are recorded
+and block numerical eligibility pending review, including flips within the
+boundary band. Systematic query-composition changes must not be dismissed as
+floating-point drift. The adapter allowlist also permits explicitly requested
+AMP under a separately named `tabicl_v2_none_amp_uncached` profile, but this
+smoke command refuses it: FP32 evidence/tolerances do not certify that profile.
+
+Resource screening records separate synchronized preparation, cold/warm
+prediction, save and fresh-process reload timings and allocator peaks, host
+memory/RSS and device free/total memory. Eligibility requires the fixed
+allocator headroom gate and no **detected** recovery/swap fallback; allocator
+headroom is not total-VRAM headroom. Both domains passed the bounded screen;
+this does not prove arbitrary full-test workloads feasible.
+
+Persistence uses official TabICL `save(..., save_model_weights=True,
+save_training_data=True, save_kv_cache=False)` / `load` with
+`model.tabicl_fit` and `model.adapter.json`. It embeds the weights, context
+and fitted preprocessing; the sidecar records versions/profile/schema,
+checkpoint provenance and artifact hash. Only load trusted native artifacts:
+the official format is pickle-based. The initial loader enforces the same
+dependency versions and **same saved device** because native unpickling uses
+the saved device before applying a load override. It does not promise CPU-only
+portability of a GPU-saved artifact. The smoke command uses a private temporary
+checkpoint copy and removes only that copy before fresh-process offline reload,
+leaving the original checkpoint untouched. All four real-model reloads passed
+offline with exactly matching probabilities on the same saved CUDA device and
+dependency versions.
+
+#### Verified local evidence and pending M08 runs
+
+All four sequential checks (Original Synthetic and Playground S5E12, n512 and
+n2000) passed numerical and reload gates. Both n2000 selections matched the
+frozen saved CatBoost identities **and order**. Maximum probability difference
+was `1.430511474609375e-6`, within the fixed engineering criterion, with zero
+threshold disagreements. Both n2000 resource gates passed; maximum PyTorch
+allocated/reserved peaks were 361.323/500 MiB. No recovery/swap was detected,
+subject to the diagnostic limitations above.
+
+| n2000 train / validation domain | Preparation (s) | 2049-query median (s) | Rows/s |
+|---|---:|---:|---:|
+| Original Synthetic | 1.929 | 31.564860 | 64.914 |
+| Playground S5E12 | 1.377 | 32.908128 | 62.264 |
+
+Preparation loads weights and prepares context/preprocessing, not gradient
+training. Uncached prediction repeats substantial context computation per
+external chunk; native CPU column-output storage does not mean CPU model
+execution. The timing screen used validation only, warm-up plus three
+repetitions, and is **not measured full-test performance**. Arbitrary inputs,
+devices, versions and profiles are not certified by these bounded checks.
+
+The research configurations are
+[Original Synthetic](configs/tabicl_v2_source_n2000_none_fp32.json) and
+[Playground S5E12](configs/tabicl_v2_kaggle_n2000_none_fp32.json). They preserve
+the validated profile, both seeds 42, the exact 2000-row sampling protocol,
+`strict_common_16`, threshold 0.5, ten calibration bins and same-domain
+validation (unused by the adapter). Output names include generation, domain,
+budget, none/FP32/uncached profile and seed, distinct from smoke/existing runs.
+Equal ensemble counts across model families do not imply equal compute.
+
+**M08 only: pending full predictive runs, not executed as part of M07.**
+Each command evaluates all three full test domains: Original Synthetic,
+Playground S5E12 and NHANES 2015–2016. Do not substitute these commands for
+validation-only smoke checks:
+
+```bash
+HF_HUB_OFFLINE=1 conda run --no-capture-output -n synthetic-tabular-ai python \
+  -m src.experiments.runner --config configs/tabicl_v2_source_n2000_none_fp32.json
+HF_HUB_OFFLINE=1 conda run --no-capture-output -n synthetic-tabular-ai python \
+  -m src.experiments.runner --config configs/tabicl_v2_kaggle_n2000_none_fp32.json
+```
 
 ### Validation-only TabPFN inference benchmark
 

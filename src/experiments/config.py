@@ -23,6 +23,9 @@ def validate_model_params(params: object, model: str = "catboost") -> None:
     if model == "tabpfn":
         validate_tabpfn_params(params)
         return
+    if model == "tabicl":
+        validate_tabicl_params(params)
+        return
     supported = {
         "iterations", "depth", "learning_rate", "loss_function", "eval_metric",
         "task_type", "thread_count", "verbose", "l2_leaf_reg",
@@ -50,6 +53,40 @@ def validate_model_params(params: object, model: str = "catboost") -> None:
                 raise ValueError(f"{key} must be one of {sorted(allowed)}.")
         elif key == "task_type" and value not in ("CPU", "GPU"):
             raise ValueError("task_type must be CPU or GPU.")
+
+
+def validate_tabicl_params(params: dict[str, Any]) -> None:
+    supported = {
+        "model_path", "device", "n_estimators", "batch_size", "norm_methods",
+        "use_amp", "use_fa3", "kv_cache", "offload_mode", "n_jobs",
+    }
+    unknown = set(params) - supported
+    if unknown:
+        raise ValueError(f"Unsupported or framework-controlled TabICL model_params: {sorted(unknown)}")
+    path = params.get("model_path")
+    if not isinstance(path, str) or not path.strip() or path == "auto":
+        raise ValueError("TabICL model_path must name an explicit local checkpoint.")
+    if params.get("norm_methods") != ["none"]:
+        raise ValueError(
+            "This experimental TabICL adapter profile requires explicit norm_methods=['none']; "
+            "this is not a general TabICL requirement."
+        )
+    for key in ("n_estimators", "batch_size", "n_jobs"):
+        if key in params:
+            positive_integer(params[key], key)
+    if "device" in params:
+        device = params["device"]
+        if not isinstance(device, str) or not (
+            device == "cpu" or (device.startswith("cuda:") and device[5:].isascii() and device[5:].isdigit())
+        ):
+            raise ValueError("TabICL device must be explicit: cpu or cuda:<index>.")
+    if "use_amp" in params and type(params["use_amp"]) is not bool:
+        raise ValueError("TabICL use_amp must be an explicit boolean, not 'auto'.")
+    for key in ("use_fa3", "kv_cache"):
+        if key in params and params[key] is not False:
+            raise ValueError(f"This TabICL profile requires {key}=false.")
+    if "offload_mode" in params and params["offload_mode"] != "cpu":
+        raise ValueError("This TabICL profile requires offload_mode='cpu' (column outputs).")
 
 
 def validate_tabpfn_params(params: dict[str, Any]) -> None:
@@ -103,8 +140,8 @@ class ExperimentConfig:
     def __post_init__(self) -> None:
         if not isinstance(self.experiment_name, str) or not self.experiment_name.strip():
             raise ValueError("experiment_name must be a nonempty string.")
-        if self.model not in ("catboost", "tabpfn"):
-            raise ValueError("model must be 'catboost' or 'tabpfn'.")
+        if self.model not in ("catboost", "tabpfn", "tabicl"):
+            raise ValueError("model must be 'catboost', 'tabpfn', or 'tabicl'.")
         for name, domain in (
             ("train_domain", self.train_domain),
             ("validation_domain", self.validation_domain),
@@ -131,7 +168,7 @@ class ExperimentConfig:
         if self.model == "catboost":
             positive_integer(self.early_stopping_rounds, "early_stopping_rounds")
         elif self.early_stopping_rounds is not None:
-            raise ValueError("TabPFN does not use early_stopping_rounds; omit it or use null.")
+            raise ValueError("Pretrained predictors do not use early_stopping_rounds; omit it or use null.")
         validate_model_params(self.model_params, self.model)
         if self.train_sample_size is not None:
             positive_integer(self.train_sample_size, "train_sample_size")

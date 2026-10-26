@@ -134,6 +134,7 @@ skrub==0.10.1
 soupsieve==3.0.3
 stack-data==0.6.3
 sympy==1.14.0
+tabicl==2.2.0
 tabpfn==9.2.0
 terminado==0.18.1
 threadpoolctl==3.7.0

@@ -98,6 +98,7 @@ def environment_metadata(model: str = "catboost") -> dict[str, Any]:
     model_packages = {
         "tabpfn": ("tabpfn", "torch"),
         "tabicl": ("tabicl", "torch", "huggingface-hub", "einops", "psutil"),
+        "ft_transformer": ("rtdl-revisiting-models", "torch"),
         "catboost": ("catboost",),
     }[model]
     for package in ("numpy", "pandas", "scikit-learn", "scipy", *model_packages):
@@ -121,6 +122,12 @@ def selection_policy(model: str) -> str:
             "No early stopping, validation-based selection, calibration or target-domain adaptation. "
             "Fixed threshold; no test-based selection. Substantial computation occurs at prediction."
         )
+    if model == "ft_transformer":
+        return (
+            "Task-trained FT-Transformer weights use training-domain train only; complete same-domain "
+            "validation labels select the highest-ROC-AUC checkpoint and control patience. Fixed "
+            "threshold; no target-domain validation, calibration, adaptation, or test-based selection."
+        )
     return (
         "One fit on training-domain train; same-domain val exclusively for early stopping. "
         "Fixed threshold; no target-domain validation, calibration, or test-based selection."
@@ -128,6 +135,18 @@ def selection_policy(model: str) -> str:
 
 
 def create_adapter(config: ExperimentConfig, schema: DatasetSchema) -> ModelAdapter:
+    if config.model == "ft_transformer":
+        from src.models.ft_transformer import FTTransformerAdapter
+
+        adapter = FTTransformerAdapter(
+            schema.features, schema.categorical_features, schema.target,
+            seed=config.seed,
+            model_params=config.model_params,
+            prediction_batch_size=config.prediction_batch_size or 256,
+        )
+        if not isinstance(adapter, FTTransformerAdapter):
+            raise TypeError("FT-Transformer factory must return an FTTransformerAdapter.")
+        return adapter
     if config.model == "tabicl":
         from src.models.tabicl import TabICLAdapter
 
@@ -248,6 +267,10 @@ def run(config: ExperimentConfig) -> Path:
             )
             adapter.synchronize()
             metadata["prediction_duration_seconds"][domain] = time.perf_counter() - predict_started
+            if config.model == "ft_transformer":
+                metadata.setdefault("unseen_category_counts", {})[domain] = (
+                    adapter.unseen_category_counts(test.X)
+                )
             if config.model == "tabicl":
                 print(f"Prediction completed in {metadata['prediction_duration_seconds'][domain]:.2f}s; writing results...", flush=True)
             evaluation = evaluate_binary(test.y, probability, config.threshold, config.calibration_bins)
@@ -263,7 +286,7 @@ def run(config: ExperimentConfig) -> Path:
             evaluations[domain] = evaluation
             write_evaluations(output, evaluations)
             metadata["resources"] = adapter.resource_metadata()
-            if config.model == "tabicl":
+            if config.model in ("tabicl", "ft_transformer"):
                 metadata["model"] = adapter.metadata()
             write_json(output / "metadata.json", metadata)
 
@@ -290,11 +313,14 @@ def run(config: ExperimentConfig) -> Path:
             total_duration_seconds=time.perf_counter() - started,
             error={"type": type(exc).__name__, "message": str(exc)},
         )
-        if config.model == "tabicl" and "adapter" in locals():
+        if config.model in ("tabicl", "ft_transformer") and "adapter" in locals():
             try:
                 metadata["resources"] = adapter.resource_metadata()
             except Exception as resource_error:
-                LOGGER.exception("Could not collect TabICL failure resources; preserving original error.")
+                LOGGER.exception(
+                    "Could not collect %s failure resources; preserving original error.",
+                    config.model,
+                )
                 exc.add_note(f"Could not collect failure resources: {resource_error}")
         if config.model in ("tabpfn", "tabicl") and "out of memory" in str(exc).lower():
             context = {

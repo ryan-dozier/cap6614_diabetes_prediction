@@ -1,6 +1,6 @@
 # FT-Transformer integration plan
 
-Status: Stage 1B design finalized — ready for implementation review
+Status: Stage 2C integration implemented — ready for Stage 3 local feasibility
 Owner: Ryan Dozier
 Stage 1A/1B design prepared by: AI assistant using Copilot SDK in VS Code
 Reviewed by: Not yet human-reviewed
@@ -38,8 +38,8 @@ Adding this baseline does not itself fulfill the project's potentially
 novel contribution. Artifact-aware interventions, adaptation, and their
 ablations remain separately tracked research tasks.
 
-This implementation addresses checklist task M09. Full predictive
-experiments belong to M10.
+This baseline contributes to checklist task M09 but does not complete it.
+Full predictive experiments belong to M10.
 
 ## 2. Scope
 
@@ -142,12 +142,12 @@ Record:
 | Actual constructor and forward API | Verified from installed source; see Stage 1A evidence below |
 | Additional dependencies | Only declared runtime dependency is PyTorch; it is already in the project environment |
 | Compatibility with the current environment | Tiny float32 forward/backward/optimizer/evaluation checks passed on CPU and CUDA; this is not a convergence, full reproducibility, resource-feasibility, or research-readiness result |
-| Planned dependency declaration | Stage 2 adds `rtdl-revisiting-models==0.0.2` to both existing environment manifests; preserve `torch==2.14.1+cu126` |
+| Dependency declaration | Stage 2C adds `rtdl-revisiting-models==0.0.2` to both existing environment manifests; preserve `torch==2.14.1+cu126` |
 | Upstream training/preprocessing example | Official package README and example notebook at the verified upstream commit; recommendations and their limits are recorded below |
 
-The dependency version and license are verified; the project-manifest pin is
-a Stage 2 implementation task, not an unresolved approval or design choice.
-No package installation or PyTorch change is planned.
+The dependency version and license are verified. The exact project-manifest
+pin is now present in both manifests; no package was installed and the
+PyTorch pin was not changed.
 
 ## 6. Initial experiment protocol
 
@@ -386,6 +386,10 @@ Checkpoint choice and early stopping are separate:
   Record its epoch, the patience reference, actual epochs executed, and
   whether stopping occurred through patience or the epoch cap.
 
+If patience is exhausted on the maximum-epoch validation check, record
+`patience` as the stopping reason because that condition is checked first;
+the epoch count still records the maximum reached.
+
 The minimum-improvement threshold affects patience only; it cannot cause the
 saved checkpoint to differ from the highest-ROC-AUC epoch.
 
@@ -475,11 +479,20 @@ identity rows.
 `load(path, *, device)` requires a complete existing file, supported
 artifact format, exact FT package version 0.0.2 and exact recorded PyTorch
 version, exact schema/architecture fields, and strict state-dict key/shape
-agreement. Reject a saved device that differs from the requested device;
-same-device reload is the initial acceptance criterion. Cross-device load
-is deferred and must not be claimed supported. Corrupt, incomplete, or
-incompatible artifacts fail explicitly; never refit preprocessing or return
-a partial/success-shaped adapter.
+agreement. Read with `map_location="cpu"` and `weights_only=True`, validate
+metadata before moving model tensors to the requested device, then construct
+and strictly restore the model. Reject a saved device that differs from the
+requested device; same-device reload is the initial acceptance criterion.
+Cross-device load is deferred and must not be claimed supported. Corrupt,
+incomplete, or incompatible artifacts fail explicitly; never refit
+preprocessing or return a partial/success-shaped adapter.
+
+The content fingerprint is distinct from sampler identity hashes. Serialize
+the schema as sorted-key compact JSON, then hash the row count, ordered raw
+normalized numeric values as little-endian float64 C-order bytes, each
+categorical column's ordered normalized strings as compact UTF-8 JSON with
+length prefixes, and labels as little-endian int64 C-order bytes, using
+SHA-256. Include a fingerprint format version in the schema portion.
 
 The saved state dict must also permit a later adaptation implementation to
 initialize the model from its learned weights; adaptation preprocessing and
@@ -767,7 +780,10 @@ Reporting integration follows completion and validation of M10 runs.
 |---|---|---|---|---|
 | Stage 1A inspection | 2026-10-26 | AI assistant using Copilot SDK in VS Code | Not yet human-reviewed | Installed source/API and project contracts inspected; synthetic CPU/CUDA check passed; see Stage 1A evidence below |
 | Stage 1B design | 2026-10-26 | AI assistant using Copilot SDK in VS Code | Not yet human-reviewed | Concrete implementation profile and acceptance criteria recorded in §§6–15 and 20 |
-| Adapter and focused tests | — | — | — | — |
+| Stage 2A preprocessing/prediction foundation | 2026-10-26 | AI assistant using Copilot SDK in VS Code | Not yet human-reviewed | Added preprocessing/prediction adapter foundation and focused tests; 14 FT adapter tests and 21 existing predictive-framework tests passed in `synthetic-tabular-ai`; training, persistence, and runner/config integration remain deferred |
+| Training and persistence (Stage 2B) | 2026-10-26 | AI assistant using Copilot SDK in VS Code | Not yet human-reviewed | 30 FT adapter tests passed; 500-epoch CPU overfit diagnostic reached BCE 0.00013014 and 100% accuracy in 5.145 s; CPU and CUDA fit/predict/save/load checks passed; CPU save/reload agreement and existing predictive-framework (21) and TabICL-adapter (17) tests passed. No project data or research profile was run. Stage 2C runner/config integration remains deferred. |
+| Stage 2B review corrections | 2026-10-26 | AI assistant using Copilot SDK in VS Code | Not yet human-reviewed | Prediction now scopes/restores declared backend settings without reseeding, including loaded adapters; loading rejects NaN/Inf state tensors; constructor canonicalizes categorical order to feature order for artifact consistency. FT adapter suite (33), predictive-framework suite (21), and TabICL-adapter suite (17) passed. No research profile or project data was run. |
+| Runner/config integration (Stage 2C) | 2026-10-26 | AI assistant using Copilot SDK in VS Code | Not yet human-reviewed | Added shared dependency-light FT parameter defaults/validation, config registration, lazy runner construction, task-trained validation policy, package metadata, per-domain unseen diagnostics, and exact dependency pins. Focused suites passed: FT runner/config 8, FT adapter 33, predictive framework 21, TabICL adapter 17. Full repository unittest suite: 170 passed in 145.187 s, no skips. `pip check` reported no broken requirements; environment YAML and all requirement lines parsed, and both manifests matched the FT pin while preserving the PyTorch pin. No project data/research run. Stage 3 feasibility remains. |
 | Local feasibility | — | — | — | — |
 | Final configuration and documentation | — | — | — | — |
 
@@ -935,18 +951,25 @@ test data during training/selection and must restore the selected checkpoint.
 | Validation data | `runner.run` loads the complete same-domain validation split with `load_partition` and passes `val.X`, `val.y` to `fit`; it does not sample validation. The FT adapter can evaluate the full validation population at each declared validation point without changes to runner data loading. |
 | Feature types/order | `data.load_feature_schema(config.feature_set)` derives ordered features and categorical/numeric lists from prepared schema metadata. For `strict_common_16`, the ordered features are `age`, `alcohol_consumption_per_week`, `bmi`, `cardiovascular_history`, `cholesterol_total`, `diastolic_bp`, `ethnicity`, `family_history_diabetes`, `gender`, `hdl_cholesterol`, `heart_rate`, `hypertension_history`, `physical_activity_minutes_per_week`, `sleep_hours_per_day`, `smoking_status`, `systolic_bp`. Categorical order: `ethnicity`, `gender`, `smoking_status`. Numeric order: `age`, `alcohol_consumption_per_week`, `bmi`, `cardiovascular_history`, `cholesterol_total`, `diastolic_bp`, `family_history_diabetes`, `hdl_cholesterol`, `heart_rate`, `hypertension_history`, `physical_activity_minutes_per_week`, `sleep_hours_per_day`, `systolic_bp`. Emit numerical and categorical tensors in these respective orders; these lists were obtained from schema metadata only, no row data was loaded. |
 | Matched identities/order | Runner loads the requested training split, then `select_training` sorts by identity, uses the existing seed-controlled proportional class allocation and without-replacement sampling, and returns selected rows in ascending identity order. The seed-42 n2000 configs therefore can reuse the exact existing selection path. `sampling_metadata` records identity and ordered-identity SHA-256; `training_sample.csv.gz` records each selected row's order and identity. |
-| Model/config registration | `ExperimentConfig` currently allows only `catboost`, `tabpfn`, and `tabicl`; `validate_model_params` has model-specific allowlists. Register `ft_transformer` with an FT-specific `model_params` allowlist for the frozen architecture/training fields in §15. Keep top-level `early_stopping_rounds=null`; do not overload the CatBoost-specific rounds setting. |
+| Model/config registration | Stage 1A found `ExperimentConfig` allowed only `catboost`, `tabpfn`, and `tabicl`, with model-specific allowlists. Stage 2C registers `ft_transformer` using a dependency-light shared validator for the frozen architecture/training fields in §15. Keep top-level `early_stopping_rounds=null`; patience/max epochs/minimum improvement control FT training. |
 | Lazy optional imports | Runner imports TabPFN and TabICL adapters only within their model branches. Those adapters defer third-party imports to runtime helper methods. FT-Transformer and torch imports should likewise remain in the FT branch/runtime so unrelated models and reporting do not require this optional adapter. |
 | Timing | Runner synchronizes around `fit` and each test-domain prediction, recording `fit_duration_seconds` and per-domain `prediction_duration_seconds`. Fit timing includes all training and any validation/checkpoint passes performed inside `fit`; it does not separately time per-epoch validation. Model saving occurs after the fit timer. Stage 3 must separately measure training and full-validation costs if those are needed for interpretation. |
 | Artifacts and status | Runner creates a fresh output directory with `exist_ok=False`, writes running/config metadata before work, saves the adapter artifact after fit, writes completed status only at success, and records failure type/message then re-raises. Existing results cannot be overwritten by reusing a run directory. There is no shared model loader in `ModelAdapter`; persistence is adapter-specific. |
 | Metadata extension | `adapter.metadata()` is stored under `metadata["model"]`; runner also exposes preprocessing and compute settings at top level. Store training history, best epoch, stopping reason, validation population, requested/effective settings, and artifact details in this nested metadata. After each FT domain prediction, refresh nested FT metadata and record that domain's unseen counts in run metadata. Keep values JSON-finite (`write_json` rejects NaN/Infinity). |
 | Reusable tests/utilities | `tests/test_predictive_framework.py` covers config validation, adapter contract, run lifecycle, failure status, and overwrite prevention. `tests/test_tabpfn_sampling.py` covers deterministic matched sampling/provenance. `tests/test_tabicl_adapter.py` supplies patterns for lazy runtime checks, preprocessing and persistence. Existing smoke workflows under `src/experiments/` and `tests/` provide examples; they are not a generic FT training adapter. |
 
-The smallest adapter integration should leave `src/models/base.py`,
-sampling, results writing, and metrics contracts unchanged. New model
-registration must add the FT branch to config validation, lazy adapter
+Stage 2B label alignment is explicit: a pandas `Series` label index must
+exactly equal its predictor frame's index and order; array-like labels align
+positionally and are never reordered. Both training and validation must
+contain labels 0 and 1.
+
+Stage 2C completed the FT branch in config validation, lazy adapter
 construction, model-specific environment metadata, and task-trained
-validation-selection policy in the runner. Future reporting manifests and
+validation-selection policy in the runner. The adapter supplies fitted
+metadata; the runner adds per-domain unseen-category diagnostics outside the
+timed prediction call and refreshes model metadata after saving and
+prediction. `src/models/base.py`, sampling, results writing, metrics, and
+shared result schemas remain unchanged. Future reporting manifests and
 display registries are explicitly deferred until results exist, consistent
 with the existing M10/reporting boundary.
 
@@ -1027,19 +1050,19 @@ these devices in the installed environment. It does not establish
 convergence, full reproducibility, resource feasibility, or research
 readiness.
 
-### 19.6 Stage 2 file-by-file implementation plan
+### 19.6 Stage 2 implementation file map and deferred work
 
-| Location | Planned Stage 2 change |
+| Location | Stage 2C outcome or explicitly deferred work |
 |---|---|
-| `src/models/ft_transformer.py` | New lazy-import adapter; train-only preprocessing/category mappings; full same-domain validation loop; best-state restoration; prediction, metadata, and adapter persistence |
-| `src/experiments/config.py` | Register `ft_transformer`; validate the exact settings in §15 and keep `early_stopping_rounds=null` |
-| `src/experiments/runner.py` | Add lazy factory branch, task-trained validation-selection policy, dependency metadata, and per-domain unknown-count metadata refresh |
-| `requirements-local.txt`, `environment.yml` | Add `rtdl-revisiting-models==0.0.2`; preserve the existing PyTorch pin |
-| `configs/ft_transformer_source_n2000.json`, `configs/ft_transformer_kaggle_n2000.json` | Add the same frozen profile for each domain with n2000, sampling seed 42, prediction batch 256, and distinct outputs |
-| `tests/test_ft_transformer_adapter.py` | Add focused preprocessing, training, stopping/restoration, prediction, and persistence tests |
-| `tests/test_predictive_framework.py` | Extend focused config/factory/runner lifecycle and per-domain diagnostic coverage |
-| `src/experiments/smoke_ft_transformer.py` | Add the bounded smoke workflow in §14, reusing the actual adapter and existing data/sampling utilities; use only train and same-domain validation |
-| `configs/smoke/ft_transformer_source.json`, `configs/smoke/ft_transformer_kaggle.json` | Add isolated bounded smoke profiles and fresh output directories; do not reuse research result paths |
+| `src/models/ft_transformer_config.py` | Added dependency-light shared FT defaults/validation so config and adapter use one parameter contract without importing Torch |
+| `src/experiments/config.py` | Registers `ft_transformer`, validates supported parameters, preserves `early_stopping_rounds=null`, and keeps same-domain validation |
+| `src/experiments/runner.py` | Adds lazy adapter construction, task-trained validation-selection/environment metadata, adapter-provided fitted metadata, and per-domain unseen counts outside prediction timing |
+| `src/models/ft_transformer.py` | Existing Stage 2A/2B adapter selected by the runner; metadata now supplies validation and compute settings expected by the framework |
+| `requirements-local.txt`, `environment.yml` | Added exact `rtdl-revisiting-models==0.0.2` pin; preserved `torch==2.14.1+cu126` |
+| `tests/test_ft_transformer_adapter.py` | Retains preprocessing, training, checkpoint, prediction, persistence, and review-regression tests |
+| `tests/test_ft_transformer_runner.py` | Added config validation/serialization, blocked optional-import checks, and synthetic real-adapter success/failure lifecycle tests |
+| `tests/test_predictive_framework.py`, `tests/test_tabicl_adapter.py` | Unmodified; both run as framework/pretrained regression coverage |
+| Research configs and `src/experiments/smoke_ft_transformer.py` | Not added in Stage 2C; remain future Stage 3/4 work and no smoke command was introduced |
 
 No `src/models/base.py`, shared metrics, sampling, artifact lifecycle, or
 result schema change is currently justified. When M10 results are prepared
@@ -1048,15 +1071,22 @@ for reporting, separately inspect the hard-coded model/profile lists in
 `src/reporting/figures.py`; reporting support is not a Stage 1A or adapter
 acceptance requirement.
 
-### 19.7 Stage 1A evidence versus later decisions
+### 19.7 Evidence status and remaining gates
 
-All implementation/dependency facts and the CPU/CUDA compatibility
-measurements in §19 are Stage 1A observations. The policy choices in §§6–15
-and §20 are Stage 1B design decisions, not verified implementation
-behavior. Adapter code, focused acceptance tests, persisted artifacts,
-convergence, full-validation cost, both-domain feasibility, matched-sample
-integration, and M09 acceptance criteria remain unexecuted future work.
-Do not mark M09 complete based on Stage 1A or Stage 1B.
+The installed-library/API facts and tiny CPU/CUDA compatibility
+measurements in §19 are Stage 1A observations. The frozen policies in
+§§6–15 and §20 are Stage 1B design decisions; the adapter and synthetic
+compatibility/runner checks now verify their covered behavior, but selecting
+the profile does not establish research convergence or feasibility.
+
+Stage 2A, Stage 2B (including review corrections), and Stage 2C have
+implementation and focused-test evidence recorded above. The complete
+repository unittest suite also passed. No actual project data split or
+research-profile run was loaded or launched. Stage 3 full-validation cost,
+resource estimates, maximum-profile behavior, and feasibility on both
+synthetic training domains remain unmeasured. Research configs, final
+documentation/checklist work, and M09 acceptance remain incomplete; do not
+mark M09 complete based on these integration checks.
 
 ### 19.8 Sources and review evidence
 
@@ -1080,24 +1110,24 @@ assistant recorded above; no human review has occurred.
 
 | Decision | Frozen initial choice |
 |---|---|
-| Implementation/dependency | `rtdl-revisiting-models==0.0.2`; add exact pin to both existing manifests during Stage 2; do not alter PyTorch |
+| Implementation/dependency | `rtdl-revisiting-models==0.0.2`; exact pin is present in both existing manifests; preserve the PyTorch pin |
 | Numeric transform | Train-only StandardScaler, preserve linear extrapolation; constant scale 1; float32 model tensors |
 | Categorical vocabulary/unknowns | Sorted train-only string vocabulary; unseen values alias the training mode embedding, with lexicographic mode tie-break; no untrained reserved embedding |
 | Model/training profile | Three blocks, width 192, eight heads, ReGLU hidden width 256; dropout 0.2/0.1/0.0; AdamW parameter groups, `lr=1e-4`, `weight_decay=1e-5`; train batch 256, max 200 epochs |
 | Selection | Full same-domain validation each epoch, batch 1024; highest ROC-AUC checkpoint, earliest exact tie; patience 20 epochs and `min_delta=0.001`; validation BCE finite-check |
 | Runtime/output | float32, `cuda:0`, no fallback; seed 42; prediction batch 256; same recipe for both domains |
 | Persistence | Atomic single-file `model.ft_transformer.pt`, versioned tensor state plus primitive preprocessing/training metadata; strict package/PyTorch/schema/state checks; same-device reload only |
-| Framework scope | Add FT-specific config allowlist, lazy runner factory/environment/selection handling and per-domain unseen counts; preserve base adapter, sampler, metrics, and result lifecycle |
+| Framework scope | FT-specific config validation, lazy runner factory/environment/selection handling and per-domain unseen counts are implemented; preserve base adapter, sampler, metrics, and result lifecycle |
 | Stage 3 bounds | Smoke: 64 train / 32 validation rows / 3 epochs; resource estimate: matched n2000 plus full validation / 2 initial epochs, extend only as needed to at most 10; research-profile feasibility: both domains, full validation, maximum 200 epochs |
 
-There is no known dependency, API, or project-contract blocker to Stage 2.
-The remaining unknowns are empirical acceptance results, not unresolved
-design choices: full-validation time and memory, full-profile training
-duration/stop behavior, and feasibility on both domains. Measure them in
-Stage 3 using the workflow in §14. Do not respond to a failure with an
-automatic fallback; revise the declared profile before any research
-evaluation if the chosen settings prove impractical.
+Stage 2C integration and its synthetic checks are complete with no known
+dependency, API, or project-contract blocker to Stage 3. The remaining
+unknowns are empirical acceptance results, not unresolved design choices:
+full-validation time and memory, full-profile training duration/stop
+behavior, and feasibility on both domains. Measure them in Stage 3 using
+the workflow in §14. Do not respond to a failure with an automatic fallback;
+revise the declared profile before any research evaluation if the chosen
+settings prove impractical.
 
-This document is ready for implementation review, but has not received
-human review. Stage 2 implementation and all unexecuted M09 acceptance
-criteria remain future work; M09 is not complete.
+This document is ready for Stage 3 local-feasibility review, but has not
+received human review. M09 remains incomplete.

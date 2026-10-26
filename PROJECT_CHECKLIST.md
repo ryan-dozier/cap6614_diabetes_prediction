@@ -1,6 +1,6 @@
 # Project checklist and contribution record
 
-Last reviewed: 2026-10-25.
+Last reviewed: 2026-10-26.
 
 ## How to use this checklist
 
@@ -29,7 +29,7 @@ This checklist combines the course requirements pasted into the project conversa
 
 Course expectations include a clear research question, related work, credible baselines, a potentially novel idea, rigorous experiments and ablations, a connection to current AI course topics, and identifiable, reasonably balanced team contributions. Recommended team size is 4–5, not a confirmed mandatory team-size rule. Publication is an optional extension, not a promised outcome.
 
-Project scope: synthetic-to-synthetic generalization between Original Synthetic and Playground S5E12, synthetic-to-real evaluation on NHANES, and few-shot adaptation using real training data. TabPFN and the implemented TabICL adapter connect the work to pretrained tabular foundation models. TabICL predictive evaluation and FT-Transformer remain planned; SAINT is optional.
+Project scope: synthetic-to-synthetic generalization between Original Synthetic and Playground S5E12, synthetic-to-real evaluation on NHANES, and few-shot adaptation using real training data. TabPFN and the implemented TabICL adapter connect the work to pretrained tabular foundation models. Initial matched TabICL predictive evaluation is complete; FT-Transformer remains planned; SAINT is optional.
 
 | Internal ID | Display name | Role |
 |---|---|---|
@@ -74,7 +74,7 @@ Project scope: synthetic-to-synthetic generalization between Original Synthetic 
 - [x] **M05 — Complete all four matched n2000, seed-42 predictive runs.** Status: Complete. Implemented by: Ryan Dozier. Evidence: six-domain-pair comparisons in the reviewed report. Each of four models evaluates all three domains.
 - [x] **M06 — Benchmark TabPFN batch sizes using validation queries.** Status: Complete. Implemented by: Ryan Dozier. Evidence: results/benchmarks/. Batch 1024 selected among tested settings; no test-metric-based selection.
 - [x] **M07 — Implement TabICL adapter and local feasibility checks.** Status: Complete (merged and locally validated). Owner: Ryan Dozier. Implemented/performed by: Ryan Dozier, with AI assistance. Reviewed by: Ryan Dozier (self-review). Evidence: [PR #4](https://github.com/ryan-dozier/cap6614_diabetes_prediction/pull/4), implementation [a680e4e](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/a680e4e), merge [242dba6](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/242dba6) on 2026-10-25; [design/final acceptance](docs/tabicl_integration_plan.md), [four-run local evidence](docs/tabicl_stage3_results.md), [adapter](src/models/tabicl.py), [smoke command](src/experiments/smoke_tabicl.py), [adapter tests](tests/test_tabicl_adapter.py), [smoke tests](tests/test_tabicl_smoke.py), and both research configs. Exact TabICL 2.2.0/checkpoint pin, train-only preprocessing, bounded none/FP32 query checks, offline same-device persistence, diagnostics, and both frozen n2000 resource gates verified. Final validation: 28 focused tests and 115 full-suite tests passed; pip check passed. Full predictive evaluation remains M08, not implied by this completion.
-- [ ] **M08 — Run both matched TabICL n2000 experiments.** Owner: Unassigned. Implemented by: —. Depends on M07. Use matching training samples, frozen evaluation splits, and explicit compute settings; validate and report outputs.
+- [x] **M08 — Run both matched TabICL n2000 experiments.** Status: Complete (saved runs validated). Owner: Ryan Dozier. Implemented/performed by: Ryan Dozier (execution), with AI-assisted artifact analysis. Reviewed by: Ryan Dozier (self-review). Evidence: [predictive results review](docs/tabicl_predictive_results.md), both completed TabICL result directories. Exact context order/schema/fingerprints and evaluation identities/labels match the existing baselines; AUC/AP/F1/Brier recomputed from predictions. Seed-42 results do not establish statistical superiority. E04 reporting integration remains pending.
 - [ ] **M09 — Implement FT-Transformer training.** Owner: Unassigned. Implemented by: —. Define train-only numeric/categorical preprocessing, unseen-category handling, validation-based selection, budget, persistence, and reproducibility. Add focused tests.
 - [ ] **M10 — Run FT-Transformer comparisons.** Owner: Unassigned. Implemented by: —. Depends on M09. Define matched-budget and any larger-budget groups explicitly; do not silently combine them.
 - [ ] **M11 — Decide whether SAINT adds enough value to implement.** Owner: Unassigned. Implemented by: —. Optional; may be marked Deferred with rationale. Do not let this delay the central contribution.
@@ -89,6 +89,8 @@ Project scope: synthetic-to-synthetic generalization between Original Synthetic 
 | Original Synthetic | TabPFN float32 | 2,000 | 256 | Completed | Ryan Dozier |
 | Playground S5E12 | CatBoost | 2,000 | 256 | Completed | Ryan Dozier |
 | Playground S5E12 | TabPFN float32 | 2,000 | 1024 | Completed | Ryan Dozier |
+| Original Synthetic | TabICLv2 none/FP32 uncached | 2,000 | 128 | Completed | Ryan Dozier |
+| Playground S5E12 | TabICLv2 none/FP32 uncached | 2,000 | 128 | Completed | Ryan Dozier |
 
 All rows evaluate Original Synthetic, Playground S5E12, and NHANES. A rerun of Original Synthetic TabPFN at batch 1024 is optional, not required to retain its valid predictive results.
 
@@ -127,7 +129,7 @@ All rows evaluate Original Synthetic, Playground S5E12, and NHANES. A rerun of O
 
 1. Keep the contribution log current as tasks are completed. Existing reviews are attributed to Ryan Dozier (self-review); reporting PR #3 and TabICL PR #4 are confirmed merged.
 2. Reconcile proposal/rubric and assign owners (R03, R07).
-3. Execute the two finalized matched TabICL configurations under M08 after confirming the clean main checkout and local checkpoint. M07 is merged through PR #4; local feasibility is not full predictive evaluation.
+3. Extend the validated comparison report to include completed TabICL runs (E04). M07 is merged and M08 completed; FT-Transformer implementation (M09) remains the next planned model adapter.
 4. In parallel with model development, finish related work and define the contribution/adaptation protocol (R05, R06, X01).
 5. Maintain documentation as research runs finish. The README batch-size wording is corrected: completed Original Synthetic TabPFN used 256; Playground TabPFN used 1024. Keep predictive completion distinct from adapter/smoke completion.
 
@@ -157,5 +159,7 @@ Repository: [ryan-dozier/cap6614_diabetes_prediction](https://github.com/ryan-do
 | R07 (tracking portion), F05 (ongoing record) | Create and maintain the project task checklist, evidence links, and contributor/self-review log; broader team assignment and final contribution statement remain pending | Ryan Dozier (with AI assistance) | Ryan Dozier (self-review) | [41e282f](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/41e282f); PROJECT_CHECKLIST.md | 2026-10-25 initial checklist commit; ongoing maintenance |
 | M07 | Inspect/design and implement TabICL adapter, configuration/factory integration, native persistence, diagnostics, smoke command, tests and final dependency/research configs | Ryan Dozier (with AI assistance) | Ryan Dozier (self-review) | [PR #4](https://github.com/ryan-dozier/cap6614_diabetes_prediction/pull/4); [a680e4e](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/a680e4e); merge [242dba6](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/242dba6); [design and final acceptance](docs/tabicl_integration_plan.md); src/models/tabicl.py; src/experiments/smoke_tabicl.py; tests/test_tabicl_adapter.py; tests/test_tabicl_smoke.py | 2026-10-25 implementation commit and merge (America/New_York) |
 | M07 | Execute and inspect four train/validation-only TabICL checks, including both matched n2000 contexts, numerical/offline reload and resource gates | Ryan Dozier (with AI assistance) | Ryan Dozier (self-review) | [PR #4](https://github.com/ryan-dozier/cap6614_diabetes_prediction/pull/4); [a680e4e](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/a680e4e); [stage-3 evidence](docs/tabicl_stage3_results.md); results/smoke/tabicl_v2_{source,kaggle}_n{512,2000}_none_fp32_run01/ | 2026-10-26 UTC completed smoke reports (2026-10-25 local); not a predictive evaluation |
+
+| M08 | Execute both matched n2000 TabICLv2 predictive runs and inspect identities, metrics, runtime, and native diagnostics | Ryan Dozier (execution; AI-assisted analysis) | Ryan Dozier (self-review) | [Predictive results review](docs/tabicl_predictive_results.md); results/predictive/tabicl_v2_{source,kaggle}_strict_common_16_n2000_none_fp32_uncached_seed42/ | Saved completion timestamps in linked metadata; review 2026-10-26 |
 
 For future contributions, append a row and update the corresponding checklist task. Use separate rows when different people implement, execute, analyze, or document the same feature. Add verified reviewer names and PR links as they become available. Research planning/writing credit should be backed by document history rather than inferred solely from code commits.

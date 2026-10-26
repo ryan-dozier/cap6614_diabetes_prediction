@@ -267,6 +267,32 @@ class AdapterTests(TabICLTestCase):
         with self.assertRaises(RuntimeError):
             adapter.fit(full.X, full.y, None, None)
 
+    def test_native_output_is_logged_without_console_echo_and_warnings_remain_visible(self):
+        adapter = self.adapter()
+        console_out, console_err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(console_out), contextlib.redirect_stderr(console_err):
+            with adapter._native_diagnostics("unbound"):
+                print("buffered native output")
+        log = self.root / "quiet_native.log"
+        adapter.set_diagnostic_path(log)
+        with contextlib.redirect_stdout(console_out), contextlib.redirect_stderr(console_err):
+            with self.assertLogs(tabicl.LOGGER, "WARNING") as messages:
+                with adapter._native_diagnostics("bound"):
+                    print("routine offload output")
+                    print("native stderr detail", file=sys.stderr)
+                    warnings.warn("visible native warning", UserWarning)
+                    print("OOM with batch_size=8, reducing to 4")
+        self.assertEqual(console_out.getvalue(), "")
+        self.assertEqual(console_err.getvalue(), "")
+        text = log.read_text()
+        for expected in ("buffered native output", "routine offload output",
+                         "native stderr detail", "visible native warning", "reducing to 4"):
+            self.assertIn(expected, text)
+        self.assertTrue(any("visible native warning" in message for message in messages.output))
+        self.assertTrue(any("recovery/swap detected" in message for message in messages.output))
+        self.assertEqual(adapter.diagnostic_metadata()["recovery_detection"], "recovery_detected")
+        self.assertNotIn("routine offload output", "".join(adapter._diagnostic_text))
+
     def test_inputs_labels_probability_and_fixed_sum_criterion(self):
         full = partition()
         for bad in (
@@ -431,9 +457,16 @@ class RunnerTests(TabICLTestCase):
                 patch.object(runner.data, "load_feature_schema", return_value=SCHEMA),
                 patch.object(runner, "prepared_fingerprints", return_value={"mock": "hash"}),
                 patch.object(runner, "load_partition", side_effect=[train, val, test]) as load,
-                contextlib.redirect_stdout(io.StringIO()),
+                contextlib.redirect_stdout(io.StringIO()) as console,
             ):
                 output = runner.run(replace(config, test_domains=("nhanes",)))
+            text = console.getvalue()
+            self.assertIn("TabICL run:", text)
+            self.assertIn("Native diagnostics:", text)
+            self.assertIn("Preparing 8 training context rows", text)
+            self.assertIn("Predicting NHANES 2015–2016: 7 rows", text)
+            self.assertEqual(text.count("Prediction completed in"), 1)
+            self.assertNotIn("Native fit diagnostics", text)
             metadata = json.loads((output / "metadata.json").read_text())
             self.assertEqual(metadata["status"], "completed")
             self.assertFalse(metadata["model"]["validation_used"])

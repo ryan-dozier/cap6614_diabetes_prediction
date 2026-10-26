@@ -24,11 +24,27 @@ Status as of 2026-10-26:
 | Matched Original Synthetic n2000 CatBoost and float32 TabPFN evaluations | Completed |
 | Original Synthetic and Playground S5E12 validation-only TabPFN benchmarks | Completed; batch 1024 selected among tested settings |
 | Matched Playground S5E12 n2000 CatBoost and float32 TabPFN batch-1024 evaluations | Completed |
-| Predictive comparison reporting | Legacy four-run CatBoost/TabPFN tables and figures remain supported; six-run CatBoost/TabPFN/TabICLv2 tables and figures are implemented and validated (E04) |
+| Predictive comparison reporting | Legacy four-run CatBoost/TabPFN tables and figures remain supported; six-run CatBoost/TabPFN/TabICLv2 tables and figures are implemented, validated, and merged (E04; PR #6) |
 | TabICL | Adapter, local checks, both matched n2000 none/FP32 predictive runs, and three-model comparison reporting complete (M07/M08/E04) |
+| TabICL console logging | Detailed native output retained in run logs; concise progress and warnings visible (PR #5 merged) |
 | FT-Transformer | Not implemented |
 
 Matched n2000 CatBoost and float32 TabPFN results for both synthetic domains are complete. The Playground S5E12 results are in `results/predictive/catboost_kaggle_strict_common_16_n2000_seed42/` and `results/predictive/tabpfn_v35_kaggle_strict_common_16_n2000_float32_seed42_batch1024/`. The Original Synthetic batch-256 predictive results are complete and remain valid; rerunning them at batch 1024 is optional and only for a runtime comparison. Benchmark measurements are computational results, not additional predictive evaluations.
+
+### Verified merge history
+
+The following merges are confirmed by local Git history. Dates use America/New_York. Implementation and merge commits are listed separately; a merge date does not establish when experiments were executed. Human contribution and self-review credits are recorded in [the checklist contribution log](PROJECT_CHECKLIST.md#contribution-log).
+
+| Merged | Feature | Pull request | Implementation | Merge commit |
+|---|---|---|---|---|
+| 2026-10-25 | TabPFN inference benchmark and batch-1024 configurations | [PR #1](https://github.com/ryan-dozier/cap6614_diabetes_prediction/pull/1) | [318a83a](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/318a83a) | [0e35652](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/0e35652) |
+| 2026-10-25 | Descriptive dataset display names | [PR #2](https://github.com/ryan-dozier/cap6614_diabetes_prediction/pull/2) | [3a21831](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/3a21831) | [ccca207](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/ccca207) |
+| 2026-10-25 | Validated predictive comparison reports and figures | [PR #3](https://github.com/ryan-dozier/cap6614_diabetes_prediction/pull/3) | [eb072c3](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/eb072c3) | [1fe3c7d](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/1fe3c7d) |
+| 2026-10-25 | TabICLv2 adapter and local feasibility | [PR #4](https://github.com/ryan-dozier/cap6614_diabetes_prediction/pull/4) | [a680e4e](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/a680e4e) | [242dba6](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/242dba6) |
+| 2026-10-26 | Concise TabICL console output and predictive-results documentation | [PR #5](https://github.com/ryan-dozier/cap6614_diabetes_prediction/pull/5) | [7b8be87](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/7b8be87) | [dbe3576](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/dbe3576) |
+| 2026-10-26 | Three-model predictive comparison reporting | [PR #6](https://github.com/ryan-dozier/cap6614_diabetes_prediction/pull/6) | [137f1f2](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/137f1f2) | [8818da2](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/8818da2) |
+
+Earlier framework/data work and direct documentation commits, including [41e282f](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/41e282f) (initial checklist) and [ea25432](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/ea25432) (documentation refresh), are recorded in the contribution log.
 
 ## Environment Setup
 

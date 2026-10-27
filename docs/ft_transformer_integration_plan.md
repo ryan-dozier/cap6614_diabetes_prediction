@@ -1,6 +1,6 @@
 # FT-Transformer integration plan
 
-Status: Stage 2C integration implemented — ready for Stage 3 local feasibility
+Status: Stage 3 complete — both domains passed full-profile local feasibility; Stage 4 acceptance remains
 Owner: Ryan Dozier
 Stage 1A/1B design prepared by: AI assistant using Copilot SDK in VS Code
 Reviewed by: Not yet human-reviewed
@@ -641,6 +641,38 @@ actual adapter, and a fresh output directory. Load training and same-domain
 validation only; never load test or NHANES validation for a synthetic-trained
 smoke run. Do not add a general benchmark harness.
 
+Stage 3A implemented the three modes and two complete-profile base
+configurations. These are the Stage 3B functional invocations (executed;
+full commands and results are recorded in
+`docs/ft_transformer_stage3_results.md`):
+
+```bash
+/home/noob/miniconda3-pbe/envs/synthetic-tabular-ai/bin/python -m src.experiments.smoke_ft_transformer \
+  --config configs/smoke/ft_transformer_source.json \
+  --mode functional \
+  --output-dir results/smoke/ft_transformer_source_functional_cuda \
+  --device cuda:0
+
+/home/noob/miniconda3-pbe/envs/synthetic-tabular-ai/bin/python -m src.experiments.smoke_ft_transformer \
+  --config configs/smoke/ft_transformer_kaggle.json \
+  --mode functional \
+  --output-dir results/smoke/ft_transformer_kaggle_functional_cuda \
+  --device cuda:0
+```
+
+Each successful invocation creates a fresh run directory containing requested and
+effective configuration JSON, `smoke.json`, compressed training/validation
+and validation-query identities, reference probabilities, and the saved
+adapter artifact. The report records mode, population sizes and identities,
+effective profile/device, per-operation timings and resource measurements,
+executed epochs, stopping/best-checkpoint details, unseen-category counts,
+prediction comparisons, and failures. Resource mode also writes the selected
+training sample using the existing result utility. Stage 3B functional,
+Stage 3C resource, and Stage 3D full-profile feasibility runs have now
+completed on project data for both domains; commands and evidence are
+recorded in `docs/ft_transformer_stage3_results.md`. No test evaluation
+has been launched.
+
 ### Gate A: Functional correctness
 
 Use an in-memory synthetic fixture for focused unit tests. The smoke command
@@ -784,7 +816,10 @@ Reporting integration follows completion and validation of M10 runs.
 | Training and persistence (Stage 2B) | 2026-10-26 | AI assistant using Copilot SDK in VS Code | Not yet human-reviewed | 30 FT adapter tests passed; 500-epoch CPU overfit diagnostic reached BCE 0.00013014 and 100% accuracy in 5.145 s; CPU and CUDA fit/predict/save/load checks passed; CPU save/reload agreement and existing predictive-framework (21) and TabICL-adapter (17) tests passed. No project data or research profile was run. Stage 2C runner/config integration remains deferred. |
 | Stage 2B review corrections | 2026-10-26 | AI assistant using Copilot SDK in VS Code | Not yet human-reviewed | Prediction now scopes/restores declared backend settings without reseeding, including loaded adapters; loading rejects NaN/Inf state tensors; constructor canonicalizes categorical order to feature order for artifact consistency. FT adapter suite (33), predictive-framework suite (21), and TabICL-adapter suite (17) passed. No research profile or project data was run. |
 | Runner/config integration (Stage 2C) | 2026-10-26 | AI assistant using Copilot SDK in VS Code | Not yet human-reviewed | Added shared dependency-light FT parameter defaults/validation, config registration, lazy runner construction, task-trained validation policy, package metadata, per-domain unseen diagnostics, and exact dependency pins. Focused suites passed: FT runner/config 8, FT adapter 33, predictive framework 21, TabICL adapter 17. Full repository unittest suite: 170 passed in 145.187 s, no skips. `pip check` reported no broken requirements; environment YAML and all requirement lines parsed, and both manifests matched the FT pin while preserving the PyTorch pin. No project data/research run. Stage 3 feasibility remains. |
-| Local feasibility | — | — | — | — |
+| Stage 3A smoke workflow | 2026-10-26 | AI assistant using Copilot SDK in VS Code | Not yet human-reviewed | Added `src/experiments/smoke_ft_transformer.py`, complete-profile source/Kaggle smoke configs, and synthetic-fixture tests. Smoke suite: 11 passed; FT adapter suite: 33 passed; FT runner suite: 8 passed. Both smoke configs loaded successfully; changed Python files compiled. No project data, smoke mode, resource estimate, or feasibility run was executed. Stage 3B–3D and M09 remain incomplete. |
+| Stage 3B functional smoke | 2026-10-26 | AI assistant using Copilot SDK in VS Code | Not yet human-reviewed | Source and Kaggle functional workflows both completed on explicit `cuda:0`; 64/32 class-stratified rows each, 3 epochs, both classes present. Identity fingerprints/disjointness/query membership, finite histories, earliest-max-AUC checkpoint, predictions across orders/batches, input nonmutation, saved artifacts, and save/reload preprocessing were inspected and verified. All checks passed at `rtol=1e-5`, `atol=1e-6`; maximum prediction difference was 2.22843e-8 (source) and 2.18362e-8 (Kaggle), with zero decision disagreements. Fit allocator peak: 17,542,656 allocated / 23,068,672 reserved bytes for each run. Exact commands, artifacts, histories, timings, fingerprints, and limitations are in `docs/ft_transformer_stage3_results.md`. No test/NHANES, resource, or feasibility mode was run. Stage 3C/3D, M09, and M10 remain incomplete. |
+| Stage 3C local resource estimates | 2026-10-26 | AI assistant using Copilot SDK in VS Code | Not yet human-reviewed | Both sequential resource-mode runs completed on explicit `cuda:0`, float32, approved three-block/192-width/eight-head profile, two-epoch override, exact matched n2000 samples, and full validation (source 15,000; Kaggle 105,000). Ordered training samples and hashes matched all three corresponding existing baselines per domain. Identity/disjointness/full-validation, finite histories, earliest-max-AUC checkpoint (epoch 2 each), unchanged configuration/persistence/schema, and all numerical checks passed at `rtol=1e-5`, `atol=1e-6`, zero decision disagreements; maximum differences 7.99831e-8 / 8.39102e-8. Fit: 12.6781 / 11.9596 s; operation-specific allocator peaks 191,702,016 allocated / 301,989,888 reserved bytes each. Startup-aware 200-epoch fit projections: 2.82-2.87 / 8.13-8.57 min; Kaggle warm epoch is 77.1% validation. Recommend proceeding locally to a separately scheduled Stage 3D; no extension, feasibility, test/NHANES, install, profile change, commit, or push. Exact commands, artifacts, timings, fingerprints, memory scopes, and projection limitations are in `docs/ft_transformer_stage3_results.md`. Stage 3D, M09, and M10 remain incomplete. |
+| Stage 3D research-profile feasibility | 2026-10-26 | AI assistant using Copilot SDK in VS Code | Not yet human-reviewed | Both sequential full-profile feasibility runs passed on explicit `cuda:0`, float32, exact n2000 samples, and full validation (15,000 / 105,000). No diagnostic epoch override or fallback. Source executed 23 epochs, selected 3; Kaggle executed 29, selected 13; both stopped at independently reconstructed first patience exhaustion (counter 20; last reset epoch 3 / 9). Complete history, earliest-max raw AUC, population membership/disjointness, Stage 3C and all baseline sampling matches, schema/preprocessing/versions/finite tensors, and numerical checks verified. Maximum query differences 1.12255e-7 / 6.38596e-8, zero threshold disagreements; save/reload exact. Independent saved-checkpoint full-validation recomputation at batch 1024 reproduced selected ROC-AUC and BCE exactly for both domains. Fit 26.7523 / 78.1768 s; total 33.8038 / 90.4664 s; fit allocator peaks 191,702,016 allocated / 304,087,040 reserved bytes each. Stage 3C projections at actual epochs were 29.2725-29.6007 / 76.8840-80.5848 s; differences explained by measured startup/overhead/epoch costs. Existing runner has no supported provenance-aware checkpoint reuse; later predictive runs retrain unless separately extended. Exact commands, artifacts, stopping audit, validation audit durations, sustained timing/memory, and limitations are in `docs/ft_transformer_stage3_results.md`. Stage 3 complete; Stage 4 and M09 remain open, M10 incomplete. No test/NHANES, predictive runner, profile change, install, PR, commit, or push. |
 | Final configuration and documentation | — | — | — | — |
 
 Record actual contributors and reviewers when work is completed.
@@ -1062,7 +1097,8 @@ readiness.
 | `tests/test_ft_transformer_adapter.py` | Retains preprocessing, training, checkpoint, prediction, persistence, and review-regression tests |
 | `tests/test_ft_transformer_runner.py` | Added config validation/serialization, blocked optional-import checks, and synthetic real-adapter success/failure lifecycle tests |
 | `tests/test_predictive_framework.py`, `tests/test_tabicl_adapter.py` | Unmodified; both run as framework/pretrained regression coverage |
-| Research configs and `src/experiments/smoke_ft_transformer.py` | Not added in Stage 2C; remain future Stage 3/4 work and no smoke command was introduced |
+| `src/experiments/smoke_ft_transformer.py`, `configs/smoke/ft_transformer_source.json`, `configs/smoke/ft_transformer_kaggle.json` | Stage 3A added functional, resource, and feasibility modes, plus complete-profile base configurations; synthetic-fixture tests cover pre-data validation, population selection, reporting, information boundaries, actual adapter fit/predict/save/reload, and failure/overwrite behavior. The exact Stage 3B functional commands appear in §14. These are smoke configs, not research configs. |
+| `tests/test_ft_transformer_smoke.py` | Added focused Stage 3A tests using synthetic partitions; no project-data command was executed. |
 
 No `src/models/base.py`, shared metrics, sampling, artifact lifecycle, or
 result schema change is currently justified. When M10 results are prepared
@@ -1079,14 +1115,24 @@ measurements in §19 are Stage 1A observations. The frozen policies in
 compatibility/runner checks now verify their covered behavior, but selecting
 the profile does not establish research convergence or feasibility.
 
-Stage 2A, Stage 2B (including review corrections), and Stage 2C have
-implementation and focused-test evidence recorded above. The complete
-repository unittest suite also passed. No actual project data split or
-research-profile run was loaded or launched. Stage 3 full-validation cost,
-resource estimates, maximum-profile behavior, and feasibility on both
-synthetic training domains remain unmeasured. Research configs, final
-documentation/checklist work, and M09 acceptance remain incomplete; do not
-mark M09 complete based on these integration checks.
+Stage 2A, Stage 2B (including review corrections), Stage 2C, and the Stage
+3A smoke workflow have implementation and focused-test evidence recorded
+above. The complete repository unittest suite passed before Stage 3A; Stage
+3A's focused smoke, adapter, and runner suites also passed. Before Stage 3B,
+no actual project data split or smoke mode had been loaded or launched.
+Stage 3B functional runs passed; see
+`docs/ft_transformer_stage3_results.md`. Stage 3C full-validation
+cost/resource estimates also passed for both domains with exact baseline
+sampling matches and the approved profile truncated to two epochs.
+Stage 3D full-profile local feasibility has now passed for both synthetic
+domains without diagnostic overrides: source executed 23 epochs, selected
+epoch 3; Kaggle executed 29, selected epoch 13. Both stopped by correctly
+reconstructed patience. Independent full-validation recomputation from
+each saved selected checkpoint reproduced AUC and BCE exactly. Sustained
+cost and scoped memory support local execution; no test evaluation occurred.
+Stage 3 is complete, not proof of convergence or predictive superiority.
+Research configs, final documentation/checklist work, and M09 acceptance
+remain incomplete; do not mark M09 complete based on these checks.
 
 ### 19.8 Sources and review evidence
 
@@ -1120,14 +1166,17 @@ assistant recorded above; no human review has occurred.
 | Framework scope | FT-specific config validation, lazy runner factory/environment/selection handling and per-domain unseen counts are implemented; preserve base adapter, sampler, metrics, and result lifecycle |
 | Stage 3 bounds | Smoke: 64 train / 32 validation rows / 3 epochs; resource estimate: matched n2000 plus full validation / 2 initial epochs, extend only as needed to at most 10; research-profile feasibility: both domains, full validation, maximum 200 epochs |
 
-Stage 2C integration and its synthetic checks are complete with no known
-dependency, API, or project-contract blocker to Stage 3. The remaining
-unknowns are empirical acceptance results, not unresolved design choices:
-full-validation time and memory, full-profile training duration/stop
-behavior, and feasibility on both domains. Measure them in Stage 3 using
-the workflow in §14. Do not respond to a failure with an automatic fallback;
-revise the declared profile before any research evaluation if the chosen
-settings prove impractical.
+Stage 2C integration, synthetic checks, and Stage 3A-3D are complete with
+no known dependency, API, or project-contract blocker to Stage 4.
+Stage 3C/3D measured full-validation time, scoped allocator memory,
+sustained costs, and full-policy patience/checkpoint behavior for both
+domains. Both passed local feasibility; no test evaluation occurred.
+Stage 4 research configuration/documentation acceptance and M09 remain
+open; M10 predictive evaluation is separate. The existing runner has no
+supported provenance-aware reuse of feasibility checkpoints, so later
+predictive runs retrain unless separately extended. No reuse feature was
+added. Do not respond to a future failure with an automatic fallback;
+revise the declared profile before research evaluation if necessary.
 
-This document is ready for Stage 3 local-feasibility review, but has not
+This document is ready for Stage 4 acceptance review, but has not
 received human review. M09 remains incomplete.

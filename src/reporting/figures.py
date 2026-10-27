@@ -9,6 +9,7 @@ from src.reporting.tables import build_calibration_rows, ordered_runs
 from src.reporting.validation import METRICS, RunArtifacts
 
 MODEL_STYLES = {
+    "ft_transformer": {"label": "FT-Transformer", "color": "#8856A7", "marker": "D"},
     "catboost": {"label": "CatBoost", "color": "#2878B5", "marker": "o"},
     "tabpfn": {"label": "TabPFN", "color": "#E87500", "marker": "s"},
     "tabicl": {"label": "TabICLv2", "color": "#25855A", "marker": "^"},
@@ -443,7 +444,7 @@ def _runtime_figure(
         va="bottom",
         fontsize=8,
     )
-    figure.tight_layout(rect=(0, 0.2, 1, 0.94))
+    figure.tight_layout(rect=(0, 0.26 if len(runs) > 6 else 0.2, 1, 0.94))
     return _save_figure(figure, plt, output, "prediction_runtime")
 
 

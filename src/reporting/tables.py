@@ -144,7 +144,7 @@ def build_runtime_rows(runs: list[RunArtifacts], manifest: dict[str, Any]) -> li
             fit_label = "fit"
         else:
             device = compute.get("device")
-            fit_label = "context_preparation"
+            fit_label = "fit" if run.spec["model"] == "ft_transformer" else "context_preparation"
         row = {
             "run_id": run.spec["run_id"],
             "model": run.spec["model"],
@@ -269,7 +269,7 @@ def build_report(
     by_role = {run.spec["role"]: run for run in runs}
     comparison = manifest["comparison"]
     schema_v2 = manifest["report_schema_version"] == 2
-    model_labels = {"catboost": "CatBoost", "tabpfn": "TabPFN", "tabicl": "TabICLv2"}
+    model_labels = {"catboost": "CatBoost", "tabpfn": "TabPFN", "tabicl": "TabICLv2", "ft_transformer": "FT-Transformer"}
     sections = [
         "# Predictive experiment comparison",
         "",
@@ -290,7 +290,7 @@ def build_report(
     ]
     if schema_v2:
         comparison_scope = (
-            "This is a schema-version-2 six-run report. Three-model figures are included."
+            f"This is a schema-version-2 {len(runs)}-run report. Figures include {len(comparison['models'])} models."
             if figure_files else
             "This is a tables-only schema-version-2 report."
         )

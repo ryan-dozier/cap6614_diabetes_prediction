@@ -1,6 +1,6 @@
 # Synthetic Tabular Data Under Distribution Shift
 
-This project studies how diabetes-prediction models trained on synthetic tabular data generalize across synthetic generators and to real survey data. **Original Synthetic: the 100,000-row Diabetes Health Indicators Dataset published on Kaggle by Mohan Krishna Thalla.** This is a descriptive project label, not an independently verified claim about original authorship or the complete generation history. Original Synthetic and Playground S5E12 are both synthetic; NHANES 2015–2016 is real survey data. CatBoost is the reference model. Pretrained TabPFN provides completed foundation-model comparisons; TabICLv2 is integrated and locally validated, with both initial n2000 predictive comparisons complete (M08). FT-Transformer is an implemented and validated task-trained neural comparison (M09); both frozen n2000 seed-42 predictive runs and their artifact validation are complete (M10). FT automated reporting integration remains pending.
+This project studies how diabetes-prediction models trained on synthetic tabular data generalize across synthetic generators and to real survey data. **Original Synthetic: the 100,000-row Diabetes Health Indicators Dataset published on Kaggle by Mohan Krishna Thalla.** This is a descriptive project label, not an independently verified claim about original authorship or the complete generation history. Original Synthetic and Playground S5E12 are both synthetic; NHANES 2015–2016 is real survey data. CatBoost is the reference model. Pretrained TabPFN provides completed foundation-model comparisons; TabICLv2 is integrated and locally validated, with both initial n2000 predictive comparisons complete (M08). FT-Transformer is an implemented and validated task-trained neural comparison (M09); both frozen n2000 seed-42 predictive runs and their artifact validation are complete (M10). FT four-model reporting is implemented and validated under E04b (merge pending).
 
 | Internal ID | Display name | Dataset |
 |---|---|---|
@@ -27,7 +27,7 @@ Status as of 2026-10-26:
 | Predictive comparison reporting | Legacy four-run CatBoost/TabPFN tables and figures remain supported; six-run CatBoost/TabPFN/TabICLv2 tables and figures are implemented, validated, and merged (E04; PR #6) |
 | TabICL | Adapter, local checks, both matched n2000 none/FP32 predictive runs, and three-model comparison reporting complete (M07/M08/E04) |
 | TabICL console logging | Detailed native output retained in run logs; concise progress and warnings visible (PR #5 merged) |
-| FT-Transformer | M09 implemented, validated, and merged through [PR #7](https://github.com/ryan-dozier/cap6614_diabetes_prediction/pull/7) on 2026-10-27. Both frozen n2000 seed-42 predictive runs and artifact validation complete (M10); [results review](docs/ft_transformer_predictive_results.md). FT automated report integration remains pending |
+| FT-Transformer | M09 implemented, validated, and merged through [PR #7](https://github.com/ryan-dozier/cap6614_diabetes_prediction/pull/7) on 2026-10-27. Both frozen n2000 seed-42 predictive runs and artifact validation complete (M10); [results review](docs/ft_transformer_predictive_results.md). FT four-model reporting is implemented and validated under E04b (merge pending) |
 
 Matched n2000 CatBoost and float32 TabPFN results for both synthetic domains are complete. The Playground S5E12 results are in `results/predictive/catboost_kaggle_strict_common_16_n2000_seed42/` and `results/predictive/tabpfn_v35_kaggle_strict_common_16_n2000_float32_seed42_batch1024/`. The Original Synthetic batch-256 predictive results are complete and remain valid; rerunning them at batch 1024 is optional and only for a runtime comparison. Benchmark measurements are computational results, not additional predictive evaluations.
 
@@ -398,8 +398,8 @@ Predictive fits took 16.79 s (source) / 53.60 s (Playground); totals were
 31.98 / 66.43 s. Source-trained FT had higher NHANES AUC/AP, while
 Playground-trained FT had lower Brier and higher F1@0.5; these measure different
 properties and are descriptive single-seed results, not statistical superiority.
-FT automated reporting integration remains pending; existing
-CatBoost/TabPFN/TabICL reports do not yet include FT-Transformer.
+E04b adds a separate FT-inclusive four-model report (merge pending); earlier
+CatBoost/TabPFN/TabICL reports are preserved.
 Historical Stage 4B final validation passed 184 repository tests with no skips,
 `pip check`, manifest pin checks, and research/smoke configuration checks.
 See the [final review and acceptance record](docs/ft_transformer_integration_plan.md#21-stage-4b-final-review-and-acceptance)
@@ -1372,3 +1372,29 @@ domain_classifier.py
     ↓
 domain_feature_ablation.py
 ```
+### Four-model comparison report (E04b)
+
+The [eight-run manifest](configs/reports/predictive_n2000_seed42_with_ft_transformer.json)
+extends schema version 2 with the frozen task-trained FT-Transformer profile.
+Legacy four-run and six-run manifests remain supported.
+
+```bash
+python3 -m src.reporting.compare_predictive --manifest configs/reports/predictive_n2000_seed42_with_ft_transformer.json --output-dir results/reports/predictive_n2000_seed42_with_ft_transformer --with-figures
+```
+
+This output directory was generated and validated on 2026-10-27. Select a new
+directory when repeating the command; existing outputs are never overwritten.
+[Report](results/reports/predictive_n2000_seed42_with_ft_transformer/report.md) /
+[validation](results/reports/predictive_n2000_seed42_with_ft_transformer/validation.json).
+
+Eight experiments produce 24 metric rows, 18 candidate-minus-CatBoost differences,
+eight runtime rows, 240 calibration rows, and six PNG/PDF pairs. All 21
+reference-to-run population checks passed; all six PNGs were inspected.
+Forty reporting tests passed, including legacy compatibility.
+Reporting uses saved predictions only. FT fitting includes training and full-validation
+checkpoint selection, not foundation-model context preparation. Equal training
+budgets do not imply equal validation-label access, pretraining, or compute.
+Allocator peaks retain their recorded cumulative scope. Conclusions remain single-seed.
+
+Results are ignored local artifacts, not supplied by cloning the repository.
+E04b is implemented and validated; human review, commit, and merge remain pending.

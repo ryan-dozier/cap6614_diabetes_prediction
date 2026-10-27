@@ -12,7 +12,7 @@ This is a descriptive, single-seed comparison, not evidence of statistical
 superiority, convergence, or a causal generator/pretraining effect. No training,
 inference, tuning, split regeneration, dependency installation, or saved-artifact
 modification was performed during the audit. No reports were overwritten.
-**FT integration into automated comparison tables/figures remains pending.**
+**E04b update (2026-10-27): four-model automated reporting is implemented and validated; merge pending.**
 
 Implementation acceptance is [M09 / Stage 4B](ft_transformer_integration_plan.md#21-stage-4b-final-review-and-acceptance).
 [Stage 3](ft_transformer_stage3_results.md) is historical train/validation-only
@@ -333,10 +333,9 @@ No confidence intervals, repeat-seed uncertainty, survey-design-adjusted
 population inference, adaptation, artifact ablations, or new calibrator are
 established. Do not select hyperparameters or thresholds from these test results.
 
-Next: explicitly extend the existing reporting model-profile validation,
+At M10 completion, the next task was to extend reporting model-profile validation,
 manifest/run selection, tables, figures, labels, and tests for FT, preserving
-legacy reports and fresh-output protection. That is a separate task, not
-implemented here. Predefine uncertainty/repeat-run and later adaptation/ablation
+legacy reports and fresh-output protection. That separate task is now implemented under E04b (see follow-up below). Predefine uncertainty/repeat-run and later adaptation/ablation
 protocols separately. M10's completion is limited to these two frozen predictive
 runs and their artifact validation, not those downstream research/reporting tasks.
 
@@ -353,3 +352,7 @@ Documentation-only changes require no model tests or full-suite rerun;
 the 184-test Stage 4B result is historical, not a new test execution.
 Local Markdown links/anchors, intended result/config paths, ignore status, and
 `git diff --check` were checked for this documentation update.
+
+## E04b reporting follow-up
+
+The [eight-run manifest](../configs/reports/predictive_n2000_seed42_with_ft_transformer.json) now generates the [four-model report](../results/reports/predictive_n2000_seed42_with_ft_transformer/report.md). This separately implemented follow-up preserves M10 artifacts and earlier reports. Eight runs and 21 population checks passed; no model execution occurred. Human review and merge remain pending.

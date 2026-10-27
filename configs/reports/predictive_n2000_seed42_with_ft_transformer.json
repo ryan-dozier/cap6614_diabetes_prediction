@@ -1,0 +1,214 @@
+{
+  "report_schema_version": 2,
+  "output_schema_version": 2,
+  "comparison": {
+    "models": [
+      "catboost",
+      "tabpfn",
+      "tabicl",
+      "ft_transformer"
+    ],
+    "training_domains": [
+      "source",
+      "kaggle"
+    ],
+    "evaluation_domains": [
+      "source",
+      "kaggle",
+      "nhanes"
+    ],
+    "feature_set": "strict_common_16",
+    "feature_order": [
+      "age",
+      "alcohol_consumption_per_week",
+      "bmi",
+      "cardiovascular_history",
+      "cholesterol_total",
+      "diastolic_bp",
+      "ethnicity",
+      "family_history_diabetes",
+      "gender",
+      "hdl_cholesterol",
+      "heart_rate",
+      "hypertension_history",
+      "physical_activity_minutes_per_week",
+      "sleep_hours_per_day",
+      "smoking_status",
+      "systolic_bp"
+    ],
+    "categorical_features": [
+      "ethnicity",
+      "gender",
+      "smoking_status"
+    ],
+    "target": "diagnosed_diabetes",
+    "training_budget": 2000,
+    "model_seed": 42,
+    "sampling_seed": 42,
+    "threshold": 0.5
+  },
+  "model_profiles": {
+    "catboost": {
+      "generation": "CatBoost CPU",
+      "validation_policy": "same_domain_early_stopping",
+      "device": "CPU",
+      "prediction_batch_size": 256
+    },
+    "tabpfn": {
+      "generation": "TabPFN v3.5 (20260909)",
+      "validation_policy": "training_context_only",
+      "device": "cuda",
+      "inference_precision": "float32",
+      "n_estimators": 4
+    },
+    "tabicl": {
+      "generation": "TabICLv2 classifier",
+      "checkpoint_revision": "4dcd344ece2c00be9e831fdd35bed57b5ad83e19",
+      "checkpoint_filename": "tabicl-classifier-v2-20260212.ckpt",
+      "package_version": "2.2.0",
+      "profile_id": "tabicl_v2_none_fp32_uncached",
+      "validation_policy": "training_context_only",
+      "device": "cuda",
+      "precision": "FP32",
+      "normalization": [
+        "none"
+      ],
+      "n_estimators": 8,
+      "native_ensemble_batch_size": 1,
+      "column_output_storage": "cpu",
+      "kv_cache": false,
+      "use_amp": false,
+      "use_fa3": false
+    },
+    "ft_transformer": {
+      "generation": "FT-Transformer (task-trained)",
+      "package_version": "0.0.2",
+      "profile_id": "ft_transformer_n2000_float32",
+      "validation_policy": "same_domain_early_stopping",
+      "device": "cuda:0",
+      "precision": "float32"
+    }
+  },
+  "runs": [
+    {
+      "role": "source_catboost",
+      "run_id": "catboost_source_strict_common_16_n2000_seed42",
+      "artifact_dir": "results/predictive/catboost_source_strict_common_16_n2000_seed42",
+      "model": "catboost",
+      "train_domain": "source",
+      "prediction_batch_size": 256,
+      "expected_device": "CPU"
+    },
+    {
+      "role": "source_tabpfn",
+      "run_id": "tabpfn_v35_source_strict_common_16_n2000_float32_seed42",
+      "artifact_dir": "results/predictive/tabpfn_v35_source_strict_common_16_n2000_float32_seed42",
+      "model": "tabpfn",
+      "train_domain": "source",
+      "prediction_batch_size": 256,
+      "expected_device": "cuda"
+    },
+    {
+      "role": "source_tabicl",
+      "run_id": "tabicl_v2_source_strict_common_16_n2000_none_fp32_uncached_seed42",
+      "artifact_dir": "results/predictive/tabicl_v2_source_strict_common_16_n2000_none_fp32_uncached_seed42",
+      "model": "tabicl",
+      "train_domain": "source",
+      "prediction_batch_size": 128,
+      "expected_device": "cuda"
+    },
+    {
+      "role": "kaggle_catboost",
+      "run_id": "catboost_kaggle_strict_common_16_n2000_seed42",
+      "artifact_dir": "results/predictive/catboost_kaggle_strict_common_16_n2000_seed42",
+      "model": "catboost",
+      "train_domain": "kaggle",
+      "prediction_batch_size": 256,
+      "expected_device": "CPU"
+    },
+    {
+      "role": "kaggle_tabpfn",
+      "run_id": "tabpfn_v35_kaggle_strict_common_16_n2000_float32_seed42_batch1024",
+      "artifact_dir": "results/predictive/tabpfn_v35_kaggle_strict_common_16_n2000_float32_seed42_batch1024",
+      "model": "tabpfn",
+      "train_domain": "kaggle",
+      "prediction_batch_size": 1024,
+      "expected_device": "cuda"
+    },
+    {
+      "role": "kaggle_tabicl",
+      "run_id": "tabicl_v2_kaggle_strict_common_16_n2000_none_fp32_uncached_seed42",
+      "artifact_dir": "results/predictive/tabicl_v2_kaggle_strict_common_16_n2000_none_fp32_uncached_seed42",
+      "model": "tabicl",
+      "train_domain": "kaggle",
+      "prediction_batch_size": 128,
+      "expected_device": "cuda"
+    },
+    {
+      "role": "source_ft_transformer",
+      "run_id": "ft_transformer_source_strict_common_16_n2000_float32_seed42",
+      "artifact_dir": "results/predictive/ft_transformer_source_strict_common_16_n2000_float32_seed42",
+      "model": "ft_transformer",
+      "train_domain": "source",
+      "prediction_batch_size": 256,
+      "expected_device": "cuda:0"
+    },
+    {
+      "role": "kaggle_ft_transformer",
+      "run_id": "ft_transformer_kaggle_strict_common_16_n2000_float32_seed42",
+      "artifact_dir": "results/predictive/ft_transformer_kaggle_strict_common_16_n2000_float32_seed42",
+      "model": "ft_transformer",
+      "train_domain": "kaggle",
+      "prediction_batch_size": 256,
+      "expected_device": "cuda:0"
+    }
+  ],
+  "comparisons": [
+    {
+      "id": "source_tabpfn_vs_catboost",
+      "training_domain": "source",
+      "baseline_role": "source_catboost",
+      "candidate_role": "source_tabpfn"
+    },
+    {
+      "id": "source_tabicl_vs_catboost",
+      "training_domain": "source",
+      "baseline_role": "source_catboost",
+      "candidate_role": "source_tabicl"
+    },
+    {
+      "id": "kaggle_tabpfn_vs_catboost",
+      "training_domain": "kaggle",
+      "baseline_role": "kaggle_catboost",
+      "candidate_role": "kaggle_tabpfn"
+    },
+    {
+      "id": "kaggle_tabicl_vs_catboost",
+      "training_domain": "kaggle",
+      "baseline_role": "kaggle_catboost",
+      "candidate_role": "kaggle_tabicl"
+    },
+    {
+      "id": "source_ft_transformer_vs_catboost",
+      "training_domain": "source",
+      "baseline_role": "source_catboost",
+      "candidate_role": "source_ft_transformer"
+    },
+    {
+      "id": "kaggle_ft_transformer_vs_catboost",
+      "training_domain": "kaggle",
+      "baseline_role": "kaggle_catboost",
+      "candidate_role": "kaggle_ft_transformer"
+    }
+  ],
+  "expected_methodological_differences": [
+    "CatBoost and FT-Transformer use full same-domain validation for selection/stopping; TabPFN and TabICL use training context only. Equal training budgets do not match validation-label access.",
+    "CatBoost executes on CPU; the TabPFN and TabICL foundation-model runs execute on CUDA.",
+    "The models use different architectures, external pretraining, and ensemble designs/counts; matching the 2,000-row training budget does not match compute.",
+    "External query batch sizes are CatBoost 256, Original Synthetic TabPFN 256, Playground S5E12 TabPFN 1024, and TabICL 128. TabICL's native ensemble batch size is separately 1.",
+    "TabICL is an explicit TabICLv2 none-normalization, uncached FP32 experimental profile, not the vendor-default normalization ensemble.",
+    "The saved TabICL native diagnostics reported no recovery detected; this is limited diagnostic evidence, not proof that scheduling was unchanged.",
+    "FT-Transformer is task-trained, not pretrained; CUDA float32 fitting includes training, full validation each epoch, and selected checkpoint restoration. Query batch size is 256.",
+    "FT allocator peaks are cumulative since the fit reset through prediction, not isolated fit peaks or total process memory. Execution Git revisions were not recorded; this report checks saved artifacts, not historical code execution or checkpoint-to-prediction equivalence."
+  ]
+}

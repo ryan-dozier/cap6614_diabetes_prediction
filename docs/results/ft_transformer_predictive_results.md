@@ -14,7 +14,7 @@ inference, tuning, split regeneration, dependency installation, or saved-artifac
 modification was performed during the audit. No reports were overwritten.
 **E04b update (2026-10-27): four-model automated reporting is implemented and validated; merge pending.**
 
-Implementation acceptance is [M09 / Stage 4B](ft_transformer_integration_plan.md#21-stage-4b-final-review-and-acceptance).
+Implementation acceptance is [M09 / Stage 4B](../plans/ft_transformer_integration_plan.md#21-stage-4b-final-review-and-acceptance).
 [Stage 3](ft_transformer_stage3_results.md) is historical train/validation-only
 feasibility evidence, not the predictive evaluation or its runtime measurements.
 The [TabICL results review](tabicl_predictive_results.md) documents the preceding
@@ -27,29 +27,29 @@ Both are synthetic; `nhanes` is real NHANES 2015–2016 survey data.
 
 | Training domain | Frozen configuration | Completed FT run |
 |---|---|---|
-| Original Synthetic | [source config](../configs/ft_transformer_source_n2000.json) | [ft_transformer_source_strict_common_16_n2000_float32_seed42](../results/predictive/ft_transformer_source_strict_common_16_n2000_float32_seed42/) |
-| Playground S5E12 | [Playground config](../configs/ft_transformer_kaggle_n2000.json) | [ft_transformer_kaggle_strict_common_16_n2000_float32_seed42](../results/predictive/ft_transformer_kaggle_strict_common_16_n2000_float32_seed42/) |
+| Original Synthetic | [source config](../../configs/ft_transformer_source_n2000.json) | [ft_transformer_source_strict_common_16_n2000_float32_seed42](../../results/predictive/ft_transformer_source_strict_common_16_n2000_float32_seed42) |
+| Playground S5E12 | [Playground config](../../configs/ft_transformer_kaggle_n2000.json) | [ft_transformer_kaggle_strict_common_16_n2000_float32_seed42](../../results/predictive/ft_transformer_kaggle_strict_common_16_n2000_float32_seed42) |
 
 Each directory contains exactly the expected ten nonempty files:
 `config.json`, `metadata.json`, `metrics.json`, `metrics.csv`,
 `calibration_bins.csv`, `training_sample.csv.gz`, `model.ft_transformer.pt`,
 and `predictions_{source,kaggle,nhanes}_test.csv.gz`.
 For direct provenance references, see the saved
-[source metadata](../results/predictive/ft_transformer_source_strict_common_16_n2000_float32_seed42/metadata.json),
-[Playground metadata](../results/predictive/ft_transformer_kaggle_strict_common_16_n2000_float32_seed42/metadata.json),
-[source metrics](../results/predictive/ft_transformer_source_strict_common_16_n2000_float32_seed42/metrics.json),
-and [Playground metrics](../results/predictive/ft_transformer_kaggle_strict_common_16_n2000_float32_seed42/metrics.json).
+[source metadata](../../results/predictive/ft_transformer_source_strict_common_16_n2000_float32_seed42/metadata.json),
+[Playground metadata](../../results/predictive/ft_transformer_kaggle_strict_common_16_n2000_float32_seed42/metadata.json),
+[source metrics](../../results/predictive/ft_transformer_source_strict_common_16_n2000_float32_seed42/metrics.json),
+and [Playground metrics](../../results/predictive/ft_transformer_kaggle_strict_common_16_n2000_float32_seed42/metrics.json).
 These result directories are **ignored local-only evidence**, not files supplied
 by a Git clone; this results document and the configurations are tracked.
 
 Baselines were explicitly selected from the existing
-[six-run manifest](../configs/reports/predictive_n2000_seed42_with_tabicl.json),
+[six-run manifest](../../configs/reports/predictive_n2000_seed42_with_tabicl.json),
 not by modification time or newest-directory matching:
 
 | Training | CatBoost | TabPFN | TabICLv2 |
 |---|---|---|---|
-| source | [catboost_source_strict_common_16_n2000_seed42](../results/predictive/catboost_source_strict_common_16_n2000_seed42/) | [tabpfn_v35_source_strict_common_16_n2000_float32_seed42](../results/predictive/tabpfn_v35_source_strict_common_16_n2000_float32_seed42/) | [tabicl_v2_source_strict_common_16_n2000_none_fp32_uncached_seed42](../results/predictive/tabicl_v2_source_strict_common_16_n2000_none_fp32_uncached_seed42/) |
-| kaggle | [catboost_kaggle_strict_common_16_n2000_seed42](../results/predictive/catboost_kaggle_strict_common_16_n2000_seed42/) | [tabpfn_v35_kaggle_strict_common_16_n2000_float32_seed42_batch1024](../results/predictive/tabpfn_v35_kaggle_strict_common_16_n2000_float32_seed42_batch1024/) | [tabicl_v2_kaggle_strict_common_16_n2000_none_fp32_uncached_seed42](../results/predictive/tabicl_v2_kaggle_strict_common_16_n2000_none_fp32_uncached_seed42/) |
+| source | [catboost_source_strict_common_16_n2000_seed42](../../results/predictive/catboost_source_strict_common_16_n2000_seed42) | [tabpfn_v35_source_strict_common_16_n2000_float32_seed42](../../results/predictive/tabpfn_v35_source_strict_common_16_n2000_float32_seed42) | [tabicl_v2_source_strict_common_16_n2000_none_fp32_uncached_seed42](../../results/predictive/tabicl_v2_source_strict_common_16_n2000_none_fp32_uncached_seed42) |
+| kaggle | [catboost_kaggle_strict_common_16_n2000_seed42](../../results/predictive/catboost_kaggle_strict_common_16_n2000_seed42) | [tabpfn_v35_kaggle_strict_common_16_n2000_float32_seed42_batch1024](../../results/predictive/tabpfn_v35_kaggle_strict_common_16_n2000_float32_seed42_batch1024) | [tabicl_v2_kaggle_strict_common_16_n2000_none_fp32_uncached_seed42](../../results/predictive/tabicl_v2_kaggle_strict_common_16_n2000_none_fp32_uncached_seed42) |
 
 Full-training-split CatBoost runs are excluded.
 
@@ -98,7 +98,7 @@ Full-training-split CatBoost runs are excluded.
   within source/kaggle and seqn within NHANES, never positional assumptions.
   The existing baseline comparison validator also passed its cross-run checks.
 - [x] **Metrics:** recomputed all six evaluations with the unchanged
-  [evaluate_binary](../src/experiments/metrics.py) definitions. Full-precision
+  [evaluate_binary](../../src/experiments/metrics.py) definitions. Full-precision
   JSON AUC/AP/F1/Brier and additional prevalence, precision, recall, log loss,
   ECE, threshold, confusion counts, warnings, and calibration bins agree.
   Maximum absolute scalar JSON metric discrepancy: **0.0** for each run.
@@ -132,9 +132,9 @@ Selected model file SHA-256:
 
 ### What requires code inspection, and what is not recorded
 
-The [runner](../src/experiments/runner.py) passes only selected training and
+The [runner](../../src/experiments/runner.py) passes only selected training and
 full same-domain validation data to fit, saves the fitted adapter, then loads
-test partitions for prediction/metrics. The [adapter](../src/models/ft_transformer.py)
+test partitions for prediction/metrics. The [adapter](../../src/models/ft_transformer.py)
 fits StandardScaler and sorted categorical vocabularies on training only;
 validation uses those transforms without refitting. Modal fallback is
 training-only with lexical tie breaking. It snapshots detached raw-best weights,
@@ -343,7 +343,7 @@ runs and their artifact validation, not those downstream research/reporting task
 
 The read-only audit used
 `/home/noob/miniconda3-pbe/envs/synthetic-tabular-ai/bin/python` with the unchanged
-[reporting validation utilities](../src/reporting/validation.py), real configuration
+[reporting validation utilities](../../src/reporting/validation.py), real configuration
 loader, identity fingerprint helpers, and metric definitions. It validated the
 six baseline runs using `validate_comparison` with the explicit existing manifest,
 then applied compatible lower-level checks to FT without extending reporting
@@ -355,4 +355,4 @@ Local Markdown links/anchors, intended result/config paths, ignore status, and
 
 ## E04b reporting follow-up
 
-The [eight-run manifest](../configs/reports/predictive_n2000_seed42_with_ft_transformer.json) now generates the [four-model report](../results/reports/predictive_n2000_seed42_with_ft_transformer/report.md). This separately implemented follow-up preserves M10 artifacts and earlier reports. Eight runs and 21 population checks passed; no model execution occurred. Human review and merge remain pending.
+The [eight-run manifest](../../configs/reports/predictive_n2000_seed42_with_ft_transformer.json) now generates the [four-model report](../../results/reports/predictive_n2000_seed42_with_ft_transformer/report.md). This separately implemented follow-up preserves M10 artifacts and earlier reports. Eight runs and 21 population checks passed; no model execution occurred. Human review and merge remain pending.

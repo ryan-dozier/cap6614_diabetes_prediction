@@ -4,8 +4,8 @@ Inspection date: 2026-10-25 (local date). Scope: stage 1 of 4.
 
 **Current status after stages 2-4:** the bounded adapter is implemented; all
 four local checks passed, including both frozen n2000 feasibility gates.
-See [stage-3 evidence](tabicl_stage3_results.md) and the
-[current README](../Readme.md#tabicl-bounded-experimental-profile-m07).
+See [stage-3 evidence](../results/tabicl_stage3_results.md) and the
+[current README](../guides/tabicl_usage.md).
 Research configurations and the TabICL 2.2.0 dependency pin are finalized.
 M07 acceptance is complete; M08 full predictive runs remain pending.
 Sections 1-10 preserve the original inspection and its then-unresolved facts,
@@ -37,10 +37,10 @@ Only this design document is added. No fetch, pull, install, upgrade, checkpoint
 download, model construction, fit, predict, commit, push, or PR operation was
 performed.
 
-Inspected [M07/M08](../PROJECT_CHECKLIST.md), [README](../Readme.md),
+Inspected [M07/M08](../../PROJECT_CHECKLIST.md), [README](../../Readme.md),
 dependency declarations, the adapters and experiment modules listed below,
 smoke/benchmark source and relevant tests, and
-[the shared display mapping](../src/domain_labels.py).
+[the shared display mapping](../../src/domain_labels.py).
 No test partition or saved predictive score was read. The only experiment
 data artifacts read were four **training-sample identity files**, not their
 features, labels, predictions, or metrics.
@@ -92,8 +92,8 @@ tqdm >=4.64.0 and huggingface-hub. `python -m pip check` returned
 that is not proof of full pandas/sklearn/runtime compatibility under inference.
 The DataFrame path needs pandas, already installed.
 
-Neither [environment.yml](../environment.yml) nor
-[requirements-local.txt](../requirements-local.txt) currently declares TabICL.
+Neither [environment.yml](../../environment.yml) nor
+[requirements-local.txt](../../requirements-local.txt) currently declares TabICL.
 Both already pin the relevant existing dependencies above. Later add only
 `tabicl==2.2.0`; do not regenerate the whole environment or upgrade torch,
 numpy, pandas, sklearn, CUDA, or Hub packages without a demonstrated need.
@@ -169,13 +169,13 @@ Line ranges refer to release source at the fixed commit above.
 
 ## 3. Existing contracts and minimal extension points
 
-There is no registry to redesign. [create_adapter](../src/experiments/runner.py#L122)
+There is no registry to redesign. [create_adapter](../../src/experiments/runner.py#L122)
 is a small explicit factory with lazy model imports.
-[ExperimentConfig](../src/experiments/config.py#L88) accepts only CatBoost and
+[ExperimentConfig](../../src/experiments/config.py#L88) accepts only CatBoost and
 TabPFN, dispatches a parameter allowlist, and currently gives TabPFN-specific
 wording for the non-CatBoost early-stopping rejection.
 
-[ModelAdapter](../src/models/base.py) already provides exact schema/order
+[ModelAdapter](../../src/models/base.py) already provides exact schema/order
 validation, copy-on-input, categorical `astype(str)`, missing/nonfinite rejection,
 external query chunks, positive-class lookup, fixed-threshold prediction,
 and resource hooks. Its required `fit(train, labels, val, labels)` signature does
@@ -212,22 +212,22 @@ Proposed contract (P):
 | File/surface | Required work |
 |---|---|
 | New `src/models/tabicl.py` | Bounded adapter, checkpoint identity guard, native persistence wrapper and sidecar, metadata/resource hooks; no base-class redesign. |
-| [config.py](../src/experiments/config.py) | Add model ID, TabICL allowlist and validation; generalize pretrained early-stopping error without weakening CatBoost behavior. |
-| [runner.py](../src/experiments/runner.py) | Lazy factory branch, train-only selection-policy text, TabICL/torch environment versions, TabICL OOM diagnostic context. Retain per-domain full-test loop for M08. |
-| [results.py](../src/experiments/results.py) | Existing atomic JSON, protected run directory, sample/prediction writers suffice; no format change required. |
-| [sampling.py](../src/experiments/sampling.py) | No algorithm/order change. Reuse exactly; assert frozen identity hashes below. |
+| [config.py](../../src/experiments/config.py) | Add model ID, TabICL allowlist and validation; generalize pretrained early-stopping error without weakening CatBoost behavior. |
+| [runner.py](../../src/experiments/runner.py) | Lazy factory branch, train-only selection-policy text, TabICL/torch environment versions, TabICL OOM diagnostic context. Retain per-domain full-test loop for M08. |
+| [results.py](../../src/experiments/results.py) | Existing atomic JSON, protected run directory, sample/prediction writers suffice; no format change required. |
+| [sampling.py](../../src/experiments/sampling.py) | No algorithm/order change. Reuse exactly; assert frozen identity hashes below. |
 | New focused tests | Mock official estimator/runtime for adapter, config, factory, optional imports, save/load and failure contracts; no downloaded weights or real inference in unit suite. |
 | New train/val-only smoke command | Separate TabICL command; reuse existing sampler, partition loader, result writers and measurement-hook pattern, not TabPFN numerical constants. |
 | Later `configs/tabicl_{source,kaggle}_n2000.json` | Stage 4 only after stage-3 evidence; distinct model/settings/output names. |
-| [README](../Readme.md), [environment.yml](../environment.yml), [requirements-local.txt](../requirements-local.txt) | Later document chosen profile, native persistence limitations and authorized checkpoint acquisition; add exact TabICL pin only. |
+| [README](../../Readme.md), [environment.yml](../../environment.yml), [requirements-local.txt](../../requirements-local.txt) | Later document chosen profile, native persistence limitations and authorized checkpoint acquisition; add exact TabICL pin only. |
 
-The [runner CLI](../src/experiments/runner.py#L284) reads a JSON config; no model
+The [runner CLI](../../src/experiments/runner.py#L284) reads a JSON config; no model
 CLI choices exist to update. Its help remains generic. New smoke CLI help must
 say train/validation only, local checkpoint required, never downloads, and
 explain ensemble versus query batch sizes. `--help` and imports must work
 without importing torch/tabicl/catboost. Existing
-[optional-import tests](../tests/test_tabpfn_sampling.py) provide the pattern.
-[src/models/__init__.py](../src/models/__init__.py) need not eagerly export models.
+[optional-import tests](../../tests/test_tabpfn_sampling.py) provide the pattern.
+[src/models/__init__.py](../../src/models/__init__.py) need not eagerly export models.
 
 Existing commands inspected:
 `python -m src.experiments.smoke_tabpfn`,
@@ -238,12 +238,12 @@ Their measurement and deterministic query-selection patterns are useful prior
 art, but their batch reference, precision and tolerances are not transferable.
 Do not route stage-3 checks through `runner.run`: it eventually loads tests.
 
-The existing [reporting validation](../src/reporting/validation.py),
-[tables](../src/reporting/tables.py) and
-[figure mapping](../src/reporting/figures.py) deliberately target specific
+The existing [reporting validation](../../src/reporting/validation.py),
+[tables](../../src/reporting/tables.py) and
+[figure mapping](../../src/reporting/figures.py) deliberately target specific
 CatBoost/TabPFN comparisons. Adding TabICL research reports is E04 work after
 M08, not an incidental stage-2 redesign. Keep raw result schemas compatible.
-No change to [domain labels](../src/domain_labels.py) is needed.
+No change to [domain labels](../../src/domain_labels.py) is needed.
 
 ## 4. Proposed allowlist and first local profile
 
@@ -476,10 +476,10 @@ each domain. Hashes use the existing sampler's
 
 Local reference files:
 
-- [Original Synthetic CatBoost context](../results/predictive/catboost_source_strict_common_16_n2000_seed42/training_sample.csv.gz)
-  and [TabPFN context](../results/predictive/tabpfn_v35_source_strict_common_16_n2000_float32_seed42/training_sample.csv.gz).
-- [Playground CatBoost context](../results/predictive/catboost_kaggle_strict_common_16_n2000_seed42/training_sample.csv.gz)
-  and [TabPFN context](../results/predictive/tabpfn_v35_kaggle_strict_common_16_n2000_float32_seed42_batch1024/training_sample.csv.gz).
+- [Original Synthetic CatBoost context](../../results/predictive/catboost_source_strict_common_16_n2000_seed42/training_sample.csv.gz)
+  and [TabPFN context](../../results/predictive/tabpfn_v35_source_strict_common_16_n2000_float32_seed42/training_sample.csv.gz).
+- [Playground CatBoost context](../../results/predictive/catboost_kaggle_strict_common_16_n2000_seed42/training_sample.csv.gz)
+  and [TabPFN context](../../results/predictive/tabpfn_v35_kaggle_strict_common_16_n2000_float32_seed42_batch1024/training_sample.csv.gz).
 
 Stage 3 must reproduce both ordered hashes using `select_training(...,2000,42)`
 and compare identity sequences to these references. A matching row count/seed
@@ -688,7 +688,7 @@ stat --format='%s' checkpoints/tabicl/4dcd344ece2c00be9e831fdd35bed57b5ad83e19/t
 
 Expected size: 110368038. Download API behavior is source/signature-based, not
 an executed download verification. Do not proceed after a digest/size failure.
-Checkpoint paths are already covered by [gitignore](../.gitignore); no weight
+Checkpoint paths are already covered by [gitignore](../../.gitignore); no weight
 or fitted-state artifact should be committed.
 
 After stage-2 implementation, proposed validation commands:
@@ -725,12 +725,12 @@ contexts before stage 4 finalizes configuration/documentation or prepares a PR.
 ## 11. Stage-2 implementation record
 
 The sections above preserve the stage-1 inspection/design. Stage 2 now adds
-[the bounded adapter](../src/models/tabicl.py),
-[mocked adapter/integration tests](../tests/test_tabicl_adapter.py),
-[the deferred smoke command](../src/experiments/smoke_tabicl.py) and
-[mocked smoke tests](../tests/test_tabicl_smoke.py), with
-[explicit none/FP32 smoke configurations](../configs/smoke/).
-The [README](../Readme.md#tabicl-bounded-experimental-profile-m07)
+[the bounded adapter](../../src/models/tabicl.py),
+[mocked adapter/integration tests](../../tests/test_tabicl_adapter.py),
+[the deferred smoke command](../../src/experiments/smoke_tabicl.py) and
+[mocked smoke tests](../../tests/test_tabicl_smoke.py), with
+[explicit none/FP32 smoke configurations](../../configs/smoke).
+The [README](../guides/tabicl_usage.md)
 documents current commands and limitations. These command/test surfaces now
 exist; their hypothetical status in section 9 is historical stage-1 context.
 
@@ -769,15 +769,15 @@ real-model numerical behavior, persistence round trip and feasibility for
 
 Stage 3 resolved the checkpoint, bounded numerical, same-device persistence,
 and two-context resource unknowns; details and limitations are retained in
-[the results document](tabicl_stage3_results.md). The saved reports were
+[the results document](../results/tabicl_stage3_results.md). The saved reports were
 rechecked during finalization, not inferred solely from earlier summaries.
 No inference, preprocessing, persistence or smoke-acceptance behavior changed
 after those runs. Only adapter metadata wording was updated to reference the
 bounded evidence without certifying a future run's arbitrary context/settings.
 Therefore the completed real-model suites were not rerun.
 
-The final [Original Synthetic](../configs/tabicl_v2_source_n2000_none_fp32.json)
-and [Playground S5E12](../configs/tabicl_v2_kaggle_n2000_none_fp32.json) research
+The final [Original Synthetic](../../configs/tabicl_v2_source_n2000_none_fp32.json)
+and [Playground S5E12](../../configs/tabicl_v2_kaggle_n2000_none_fp32.json) research
 configurations preserve the actual n2000 smoke configuration except for
 experiment/output names. Both load through the real loader, resolve to distinct
 unused predictive output directories, and reproduce the exact frozen training
@@ -795,7 +795,7 @@ separate from mocked integration tests; neither is full predictive evaluation.
 Ryan Dozier implemented/performed and reviewed this work with AI assistance;
 review is self-review, not an independent approval. PR pending; no commit,
 push, PR creation, merge, or M08 evaluation is part of this acceptance.
-See the [checklist contribution record](../PROJECT_CHECKLIST.md#contribution-log).
+See the [checklist contribution record](../../PROJECT_CHECKLIST.md#contribution-log).
 
 [tag]: https://api.github.com/repos/soda-inria/tabicl/git/ref/tags/v2.2.0
 [pyproject]: https://github.com/soda-inria/tabicl/blob/0dbff3ec8fc68c123c87af77b0ea8b25cd2d23f3/pyproject.toml

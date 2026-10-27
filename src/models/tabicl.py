@@ -422,7 +422,7 @@ class TabICLAdapter(ModelAdapter):
                 "Train-only summaries/attention. External chunks are query rows; native batch_size is ensemble members. "
                 "Bounded local checks passed for the documented none/FP32 profile and both n2000 contexts; "
                 "arbitrary inputs, devices, versions, and profiles are not certified. "
-                "This is historical evidence, not certification of this run. See docs/tabicl_stage3_results.md."
+                "This is historical evidence, not certification of this run. See docs/results/tabicl_stage3_results.md."
             ),
             "persistence": {
                 "method": "Official TabICL save/load, trusted pickle-based native format plus adapter sidecar.",

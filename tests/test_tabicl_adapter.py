@@ -260,7 +260,7 @@ class AdapterTests(TabICLTestCase):
         self.assertEqual(metadata["effective_ensemble_count"], 8)
         self.assertEqual(metadata["native_diagnostics"]["recovery_detection"], "no_recovery_detected")
         self.assertIn("not proof", metadata["native_diagnostics"]["limitations"])
-        self.assertIn("docs/tabicl_stage3_results.md", metadata["query_policy"])
+        self.assertIn("docs/results/tabicl_stage3_results.md", metadata["query_policy"])
         self.assertIn("not certification of this run", metadata["query_policy"])
         json.dumps(metadata, allow_nan=False)
         self.assertIn("Native fit diagnostics", (self.root / "native.log").read_text())

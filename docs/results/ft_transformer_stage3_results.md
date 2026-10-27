@@ -262,8 +262,8 @@ reviewed before Kaggle started. Exact commands:
 
 Actual artifact directories:
 
-- [Source resource run](../results/smoke/ft_transformer_source_resource_cuda_e2/)
-- [Kaggle resource run](../results/smoke/ft_transformer_kaggle_resource_cuda_e2/)
+- [Source resource run](../../results/smoke/ft_transformer_source_resource_cuda_e2)
+- [Kaggle resource run](../../results/smoke/ft_transformer_kaggle_resource_cuda_e2)
 
 Each contains `smoke.json`, `requested_config.json`,
 `effective_config.json`, `training_identities.csv.gz`,
@@ -544,8 +544,8 @@ Exact commands:
 
 Artifacts:
 
-- [Source feasibility run](../results/smoke/ft_transformer_source_feasibility_cuda/)
-- [Kaggle feasibility run](../results/smoke/ft_transformer_kaggle_feasibility_cuda/)
+- [Source feasibility run](../../results/smoke/ft_transformer_source_feasibility_cuda)
+- [Kaggle feasibility run](../../results/smoke/ft_transformer_kaggle_feasibility_cuda)
 
 Each directory contains the same nine artifact types listed for Stage 3C.
 The original `smoke.json` files were not rewritten for post-run audits;

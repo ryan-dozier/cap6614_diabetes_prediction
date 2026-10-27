@@ -7,8 +7,8 @@ execution, numerical, and persistence gates; both frozen n2000 contexts also
 passed the prescribed local resource screen. There were no failed attempts or
 implementation corrections. M07 remains unchecked pending stage-4 final review;
 M08 and predictive research runs are unchanged. Subsequent stage-4 acceptance
-is recorded in [the integration plan](tabicl_integration_plan.md#12-final-acceptance-and-stage-4-handoff)
-and [checklist](../PROJECT_CHECKLIST.md); the unchecked M07 references below
+is recorded in [the integration plan](../plans/tabicl_integration_plan.md#12-final-acceptance-and-stage-4-handoff)
+and [checklist](../../PROJECT_CHECKLIST.md); the unchecked M07 references below
 describe the stage-3 boundary.
 
 This stage evaluates the explicit experimental profile
@@ -17,7 +17,7 @@ a universal TabICL requirement. Only training and validation partitions are
 loaded. No accuracy, ROC-AUC, other predictive metrics, or test-partition
 inference are used.
 
-The predeclared protocol is in [the integration plan](tabicl_integration_plan.md).
+The predeclared protocol is in [the integration plan](../plans/tabicl_integration_plan.md).
 All attempts use new output directories; there is no automatic retry with a
 different model configuration or relaxed acceptance criterion.
 

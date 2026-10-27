@@ -27,7 +27,7 @@ Status as of 2026-10-26:
 | Predictive comparison reporting | Legacy four-run CatBoost/TabPFN tables and figures remain supported; six-run CatBoost/TabPFN/TabICLv2 tables and figures are implemented, validated, and merged (E04; PR #6) |
 | TabICL | Adapter, local checks, both matched n2000 none/FP32 predictive runs, and three-model comparison reporting complete (M07/M08/E04) |
 | TabICL console logging | Detailed native output retained in run logs; concise progress and warnings visible (PR #5 merged) |
-| FT-Transformer | Implemented and validated (M09; Stage 4B acceptance 2026-10-26): both full-profile local feasibility runs and final 184-test suite passed; research configs frozen. Human review/merge not recorded; predictive runs (M10) and FT report integration remain pending |
+| FT-Transformer | Implemented and validated (M09; Stage 4B acceptance 2026-10-26): both full-profile local feasibility runs and final 184-test suite passed; research configs frozen. Merged through [PR #7](https://github.com/ryan-dozier/cap6614_diabetes_prediction/pull/7) on 2026-10-27; predictive runs (M10) and FT report integration remain pending |
 
 Matched n2000 CatBoost and float32 TabPFN results for both synthetic domains are complete. The Playground S5E12 results are in `results/predictive/catboost_kaggle_strict_common_16_n2000_seed42/` and `results/predictive/tabpfn_v35_kaggle_strict_common_16_n2000_float32_seed42_batch1024/`. The Original Synthetic batch-256 predictive results are complete and remain valid; rerunning them at batch 1024 is optional and only for a runtime comparison. Benchmark measurements are computational results, not additional predictive evaluations.
 
@@ -43,6 +43,7 @@ The following merges are confirmed by local Git history. Dates use America/New_Y
 | 2026-10-25 | TabICLv2 adapter and local feasibility | [PR #4](https://github.com/ryan-dozier/cap6614_diabetes_prediction/pull/4) | [a680e4e](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/a680e4e) | [242dba6](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/242dba6) |
 | 2026-10-26 | Concise TabICL console output and predictive-results documentation | [PR #5](https://github.com/ryan-dozier/cap6614_diabetes_prediction/pull/5) | [7b8be87](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/7b8be87) | [dbe3576](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/dbe3576) |
 | 2026-10-26 | Three-model predictive comparison reporting | [PR #6](https://github.com/ryan-dozier/cap6614_diabetes_prediction/pull/6) | [137f1f2](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/137f1f2) | [8818da2](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/8818da2) |
+| 2026-10-27 | FT-Transformer adapter, feasibility, and frozen configs (M09) | [PR #7](https://github.com/ryan-dozier/cap6614_diabetes_prediction/pull/7) | Planning [9d9b214](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/9d9b214); Stage 2 [9f6f16c](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/9f6f16c); Stage 3 [72f7132](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/72f7132); final acceptance [d03c8b6](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/d03c8b6) | [a42668e](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/a42668e) |
 
 Earlier framework/data work and direct documentation commits, including [41e282f](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/41e282f) (initial checklist) and [ea25432](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/ea25432) (documentation refresh), are recorded in the contribution log.
 
@@ -303,7 +304,7 @@ Choose a new `output_dir` in the JSON configuration for every rerun. Outputs:
   authoritative identifiers, and zero-based `sample_order` (also emitted for
   full-data runs).
 
-#### FT-Transformer: implemented and validated (M09)
+#### FT-Transformer: implemented, validated, and merged (M09)
 
 FT-Transformer is a **task-trained neural comparison**, not a pretrained
 foundation model. TabPFN/TabICL are pretrained comparisons and CatBoost
@@ -394,7 +395,7 @@ Stage 4B final validation passed 184 repository tests with no skips,
 `pip check`, manifest pin checks, and research/smoke configuration checks.
 See the [final review and acceptance record](docs/ft_transformer_integration_plan.md#21-stage-4b-final-review-and-acceptance)
 for the artifact-validation corrections and evidence scope. This is
-automated technical acceptance, not a claim of human review or merge.
+automated technical acceptance. [PR #7](https://github.com/ryan-dozier/cap6614_diabetes_prediction/pull/7) subsequently merged on 2026-10-27 as [a42668e](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/a42668e); human review is not separately documented.
 Detailed evidence documents are tracked in Git, but their linked
 `results/` outputs and saved checkpoints are ignored local artifacts and
 are not supplied by cloning the repository.

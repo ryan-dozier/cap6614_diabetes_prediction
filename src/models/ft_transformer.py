@@ -1005,6 +1005,8 @@ class FTTransformerAdapter(ModelAdapter):
             validate_ft_transformer_params(saved_params)
         except (KeyError, TypeError, ValueError) as exc:
             raise ValueError("Artifact model parameters are invalid.") from exc
+        if saved_params["device"] != payload["device"]:
+            raise ValueError("Artifact constructor device metadata is inconsistent with saved device.")
         if (
             type(train_size) is not int or train_size <= 0
             or type(validation_size) is not int or validation_size <= 0
@@ -1072,12 +1074,10 @@ class FTTransformerAdapter(ModelAdapter):
             or not 0 <= training["patience_counter"] <= epochs
         ):
             raise ValueError("Artifact checkpoint-selection metadata is invalid.")
-        best_history_epoch = min(
-            record["epoch"] for record in history
-            if record["validation_roc_auc"] == training["best_validation_roc_auc"]
-        ) if history else None
+        best_history = max(history, key=lambda record: record["validation_roc_auc"])
         expected_reference: float | None = None
         expected_patience_counter = 0
+        first_patience_epoch: int | None = None
         for record in history:
             auc = record["validation_roc_auc"]
             if expected_reference is None:
@@ -1087,18 +1087,20 @@ class FTTransformerAdapter(ModelAdapter):
                 expected_patience_counter = 0
             else:
                 expected_patience_counter += 1
+            if expected_patience_counter >= saved_params["patience"] and first_patience_epoch is None:
+                first_patience_epoch = record["epoch"]
         expected_stopping_reason = (
             "patience"
             if expected_patience_counter >= saved_params["patience"]
             else "max_epochs"
         )
         if (
-            best_history_epoch != best_epoch
-            or max(record["validation_roc_auc"] for record in history)
-            != training["best_validation_roc_auc"]
+            best_history["epoch"] != best_epoch
+            or best_history["validation_roc_auc"] != training["best_validation_roc_auc"]
             or expected_reference != training["patience_reference"]
             or expected_patience_counter != training["patience_counter"]
             or training["stopping_reason"] != expected_stopping_reason
+            or (first_patience_epoch is not None and first_patience_epoch != epochs)
             or (expected_stopping_reason == "max_epochs" and epochs != saved_params["max_epochs"])
         ):
             raise ValueError("Artifact checkpoint selection and stopping metadata are inconsistent.")

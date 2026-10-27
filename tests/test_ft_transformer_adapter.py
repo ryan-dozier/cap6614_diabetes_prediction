@@ -793,6 +793,56 @@ class FTTransformerPersistenceTests(unittest.TestCase):
                         FTTransformerAdapter.load(path, device="cpu")
             payload["state_dict"][first_key] = original
 
+    def test_load_rejects_history_continuing_after_first_patience_exhaustion(self):
+        adapter, _ = self.fitted_adapter()
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / adapter.artifact_name
+            adapter.save(path)
+            payload = adapter._torch.load(path, map_location="cpu", weights_only=True)
+            payload["constructor"]["model_params"].update(max_epochs=4, patience=1)
+            training = payload["training"]
+            template = training["training_history"][0]
+            training["training_history"] = [
+                {**template, "epoch": epoch, "validation_roc_auc": auc}
+                for epoch, auc in enumerate((0.6, 0.6, 0.7, 0.7), start=1)
+            ]
+            training.update(
+                epochs_executed=4, best_epoch=3, best_validation_roc_auc=0.7,
+                patience_reference=0.7, patience_counter=1, stopping_reason="patience",
+            )
+            adapter._torch.save(payload, path)
+            with self.assertRaisesRegex(ValueError, "checkpoint selection and stopping"):
+                FTTransformerAdapter.load(path, device="cpu")
+
+    def test_load_rejects_best_auc_absent_from_history_with_clear_error(self):
+        adapter, _ = self.fitted_adapter()
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / adapter.artifact_name
+            adapter.save(path)
+            payload = adapter._torch.load(path, map_location="cpu", weights_only=True)
+            recorded = {record["validation_roc_auc"] for record in payload["training"]["training_history"]}
+            payload["training"]["best_validation_roc_auc"] = next(
+                value for value in (0.123, 0.456, 0.789) if value not in recorded
+            )
+            adapter._torch.save(payload, path)
+            with self.assertRaisesRegex(ValueError, "checkpoint selection and stopping"):
+                FTTransformerAdapter.load(path, device="cpu")
+
+    def test_load_rejects_constructor_device_inconsistent_with_saved_device(self):
+        adapter, _ = self.fitted_adapter()
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / adapter.artifact_name
+            adapter.save(path)
+            payload = adapter._torch.load(path, map_location="cpu", weights_only=True)
+            payload["constructor"]["model_params"]["device"] = "cuda:0"
+            adapter._torch.save(payload, path)
+            with patch.object(
+                FTTransformerAdapter, "_check_device",
+                side_effect=AssertionError("inconsistent artifact must fail before device allocation"),
+            ):
+                with self.assertRaisesRegex(ValueError, "device metadata is inconsistent"):
+                    FTTransformerAdapter.load(path, device="cpu")
+
     def test_artifact_contains_only_tensor_state_and_primitive_metadata(self):
         adapter, _ = self.fitted_adapter()
         with tempfile.TemporaryDirectory() as temporary:

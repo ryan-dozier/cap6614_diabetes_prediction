@@ -264,8 +264,12 @@ def _check_manifest_v2(manifest: dict[str, Any]) -> list[dict[str, Any]]:
     comparison = manifest.get("comparison")
     if not isinstance(comparison, dict):
         raise ReportValidationError("manifest.json field comparison must be an object")
+    models = comparison.get("models")
+    if models not in (["catboost", "tabpfn", "tabicl"],
+                      ["catboost", "tabpfn", "tabicl", "ft_transformer"]):
+        raise ReportValidationError("comparison.models must declare the supported three- or four-model group")
     expected_comparison = {
-        "models": ["catboost", "tabpfn", "tabicl"],
+        "models": models,
         "training_domains": ["source", "kaggle"],
         "evaluation_domains": ["source", "kaggle", "nhanes"],
         "feature_set": "strict_common_16",
@@ -296,7 +300,7 @@ def _check_manifest_v2(manifest: dict[str, Any]) -> list[dict[str, Any]]:
 
     profiles = manifest.get("model_profiles")
     if not isinstance(profiles, dict) or set(profiles) != set(expected_comparison["models"]):
-        raise ReportValidationError("manifest.json field model_profiles must define all three models")
+        raise ReportValidationError("manifest.json field model_profiles must define all declared models")
     expected_profiles = {
         "catboost": {
             "generation": "CatBoost CPU",
@@ -329,6 +333,15 @@ def _check_manifest_v2(manifest: dict[str, Any]) -> list[dict[str, Any]]:
             "use_fa3": False,
         },
     }
+    if "ft_transformer" in models:
+        expected_profiles["ft_transformer"] = {
+            "generation": "FT-Transformer (task-trained)",
+            "package_version": "0.0.2",
+            "profile_id": "ft_transformer_n2000_float32",
+            "validation_policy": "same_domain_early_stopping",
+            "device": "cuda:0",
+            "precision": "float32",
+        }
     for model, required in expected_profiles.items():
         actual = profiles[model]
         if not isinstance(actual, dict):
@@ -341,8 +354,8 @@ def _check_manifest_v2(manifest: dict[str, Any]) -> list[dict[str, Any]]:
                 )
 
     runs = manifest.get("runs")
-    if not isinstance(runs, list) or len(runs) != 6:
-        raise ReportValidationError("manifest.json field runs must contain exactly six explicit run entries")
+    if not isinstance(runs, list) or len(runs) != 2 * len(models):
+        raise ReportValidationError("manifest.json field runs must contain exactly two explicit runs per declared model")
     required_roles = {
         f"{domain}_{model}"
         for domain in expected_comparison["training_domains"]
@@ -355,9 +368,11 @@ def _check_manifest_v2(manifest: dict[str, Any]) -> list[dict[str, Any]]:
         ("source", "catboost"): 256,
         ("source", "tabpfn"): 256,
         ("source", "tabicl"): 128,
+        ("source", "ft_transformer"): 256,
         ("kaggle", "catboost"): 256,
         ("kaggle", "tabpfn"): 1024,
         ("kaggle", "tabicl"): 128,
+        ("kaggle", "ft_transformer"): 256,
     }
     for index, spec in enumerate(runs):
         if not isinstance(spec, dict):
@@ -403,15 +418,15 @@ def _check_manifest_v2(manifest: dict[str, Any]) -> list[dict[str, Any]]:
         raise ReportValidationError(f"manifest.json runs must cover roles {sorted(required_roles)}")
 
     comparisons = manifest.get("comparisons")
-    if not isinstance(comparisons, list) or len(comparisons) != 4:
-        raise ReportValidationError("manifest.json field comparisons must contain four explicit comparisons")
+    if not isinstance(comparisons, list) or len(comparisons) != 2 * (len(models) - 1):
+        raise ReportValidationError("manifest.json field comparisons must contain " + ("four" if len(models) == 3 else "six") + " explicit comparisons")
     spec_by_role = {spec["role"]: spec for spec in runs}
     seen_comparison_ids: set[str] = set()
     seen_pairs: set[tuple[str, str]] = set()
     expected_pairs = {
         (domain, f"{domain}_catboost", f"{domain}_{candidate}")
         for domain in expected_comparison["training_domains"]
-        for candidate in ("tabpfn", "tabicl")
+        for candidate in models[1:]
     }
     actual_pairs: set[tuple[str, str, str]] = set()
     for index, item in enumerate(comparisons):
@@ -440,9 +455,9 @@ def _check_manifest_v2(manifest: dict[str, Any]) -> list[dict[str, Any]]:
             raise ReportValidationError(
                 f"manifest.json comparisons[{index}] contains a cross-training-domain pair"
             )
-        if baseline["model"] != "catboost" or candidate["model"] not in {"tabpfn", "tabicl"}:
+        if baseline["model"] != "catboost" or candidate["model"] not in models[1:]:
             raise ReportValidationError(
-                f"manifest.json comparisons[{index}] must use CatBoost baseline and a foundation-model candidate"
+                f"manifest.json comparisons[{index}] must use CatBoost baseline and a declared candidate"
             )
         pair = (baseline_role, candidate_role)
         if pair in seen_pairs:
@@ -450,7 +465,7 @@ def _check_manifest_v2(manifest: dict[str, Any]) -> list[dict[str, Any]]:
         seen_pairs.add(pair)
         actual_pairs.add((item["training_domain"], baseline_role, candidate_role))
     if actual_pairs != expected_pairs:
-        raise ReportValidationError("manifest.json comparisons must declare both candidates against CatBoost per domain")
+        raise ReportValidationError("manifest.json comparisons must declare all candidates against CatBoost per domain")
 
     differences = manifest.get("expected_methodological_differences")
     if not isinstance(differences, list) or not differences or not all(
@@ -511,6 +526,10 @@ def _validate_v2_model_profile(
             or compute.get("task_type") != "CPU"
         ):
             _fail(spec["run_id"], "config.json", "model_params.task_type", "expected CatBoost CPU execution")
+        return
+
+    if model_name == "ft_transformer":
+        _validate_ft_profile(spec, config, metadata)
         return
 
     effective = model.get("effective_init_parameters")
@@ -627,6 +646,67 @@ def _validate_v2_model_profile(
         _fail(spec["run_id"], "metadata.json", "model.experimental_profile", "expected explicit none/FP32/uncached profile")
 
 
+
+def _validate_ft_profile(spec: dict, config: dict, metadata: dict) -> None:
+    # Pure config import: reporting never imports Torch or loads model weights.
+    from src.models.ft_transformer_config import FT_DEFAULT_PARAMS
+    model = metadata["model"]
+    compute = metadata["compute_settings"]
+    def require(condition: bool, field: str) -> None:
+        if not condition:
+            _fail(spec["run_id"], "metadata.json/config.json", field,
+                  "does not match the frozen FT-Transformer profile")
+    require(config.get("model_params") == FT_DEFAULT_PARAMS, "model_params")
+    require(model.get("model_params") == FT_DEFAULT_PARAMS, "model.model_params")
+    require(config.get("validation_domain") == config.get("train_domain"), "validation_domain")
+    require(model.get("validation_used") is True and model.get("model_type") == "task-trained",
+            "model.validation_used/model_type")
+    require(model.get("ready") is True and model.get("adapter") == "FTTransformerAdapter", "model.adapter")
+    require(model.get("precision") == "float32" and compute.get("precision") == "float32",
+            "precision")
+    require(model.get("device") == compute.get("device") == "cuda:0", "device")
+    require(model.get("versions", {}).get("rtdl-revisiting-models") == "0.0.2", "package_version")
+    require(compute.get("architecture") == {k: FT_DEFAULT_PARAMS[k] for k in
+            ("n_blocks", "d_block", "attention_n_heads", "attention_dropout",
+             "ffn_d_hidden", "ffn_d_hidden_multiplier", "ffn_activation", "ffn_dropout",
+             "residual_dropout")}, "compute_settings.architecture")
+    det = compute.get("determinism", {})
+    require(det.get("cuda_matmul_allow_tf32") is False and det.get("cudnn_allow_tf32") is False
+            and det.get("cudnn_benchmark") is False and det.get("cudnn_deterministic") is True,
+            "compute_settings.determinism")
+    training = model.get("training", {})
+    history = training.get("training_history")
+    require(isinstance(history, list) and 0 < len(history) <= 200, "training_history")
+    best, reference, counter = None, None, 0
+    for epoch, row in enumerate(history, 1):
+        require(isinstance(row, dict) and row.get("epoch") == epoch, "training_history.epoch")
+        auc = _number(row.get("validation_roc_auc"), spec["run_id"], "metadata.json", "validation_roc_auc")
+        require(auc is not None and 0 <= auc <= 1, "validation_roc_auc")
+        for field in ("training_loss", "validation_loss", "training_duration_seconds", "validation_duration_seconds"):
+            value = _number(row.get(field), spec["run_id"], "metadata.json", field)
+            require(value is not None and value >= 0, field)
+        if best is None or auc > best[1]:
+            best = (epoch, auc)
+        if reference is None or auc - reference >= 0.001:
+            reference, counter = auc, 0
+        else:
+            counter += 1
+        require(counter < 20 or epoch == len(history), "first patience exhaustion")
+    require(training.get("best_epoch") == best[0] and
+            training.get("best_validation_roc_auc") == best[1], "selected checkpoint")
+    require(training.get("epochs_executed") == len(history) and
+            training.get("patience_counter") == counter and
+            training.get("patience_reference") == reference, "training stop counters")
+    require((counter == 20 and training.get("stopping_reason") == "patience") or
+            (counter < 20 and len(history) == 200 and training.get("stopping_reason") == "max_epochs"),
+            "stopping_reason")
+    require(training.get("training_population_size") == metadata["training_context"]["rows"],
+            "training_population_size")
+    val = metadata["splits"][config["train_domain"] + "/val"]
+    require(training.get("validation_population_size") == val["rows"] and
+            training.get("validation_class_counts") == val["class_counts"], "validation population")
+
+
 def validate_run(spec: dict[str, Any], run_dir: Path, manifest: dict[str, Any]) -> RunArtifacts:
     run = spec["run_id"]
     domains = manifest["comparison"]["evaluation_domains"]
@@ -709,7 +789,7 @@ def validate_run(spec: dict[str, Any], run_dir: Path, manifest: dict[str, Any]) 
             _fail(run, "config.json", "model_params.device", "expected recorded CUDA execution")
     else:
         if config.get("early_stopping_rounds") is not None:
-            _fail(run, "config.json", "early_stopping_rounds", "TabICL must not use early stopping")
+            _fail(run, "config.json", "early_stopping_rounds", "generic early_stopping_rounds must be null for this model")
         params = config.get("model_params")
         if not isinstance(params, dict) or not str(params.get("device", "")).startswith("cuda:"):
             _fail(run, "config.json", "model_params.device", "expected recorded CUDA execution")
@@ -1015,6 +1095,7 @@ def validate_run(spec: dict[str, Any], run_dir: Path, manifest: dict[str, Any]) 
         "catboost": "catboost_cpu",
         "tabpfn": "tabpfn_v35_float32",
         "tabicl": model.get("experimental_profile"),
+        "ft_transformer": "ft_transformer_n2000_float32",
     }[spec["model"]]
     generation = (
         manifest.get("model_profiles", {}).get("catboost", {}).get("generation", "CatBoost")
@@ -1025,6 +1106,8 @@ def validate_run(spec: dict[str, Any], run_dir: Path, manifest: dict[str, Any]) 
             else None
         )
     )
+    if spec["model"] == "ft_transformer":
+        generation = manifest["model_profiles"]["ft_transformer"]["generation"]
     return RunArtifacts(
         spec=spec,
         run_dir=run_dir,

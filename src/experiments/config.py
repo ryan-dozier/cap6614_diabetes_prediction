@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from src.data import Domain, FeatureSet, VALID_DOMAINS, VALID_FEATURE_SETS
+from src.models.ft_transformer_config import resolve_ft_transformer_params
 from src.paths import PROJECT_ROOT, RESULTS_DIR
 
 
@@ -25,6 +26,9 @@ def validate_model_params(params: object, model: str = "catboost") -> None:
         return
     if model == "tabicl":
         validate_tabicl_params(params)
+        return
+    if model == "ft_transformer":
+        resolve_ft_transformer_params(params)
         return
     supported = {
         "iterations", "depth", "learning_rate", "loss_function", "eval_metric",
@@ -140,8 +144,8 @@ class ExperimentConfig:
     def __post_init__(self) -> None:
         if not isinstance(self.experiment_name, str) or not self.experiment_name.strip():
             raise ValueError("experiment_name must be a nonempty string.")
-        if self.model not in ("catboost", "tabpfn", "tabicl"):
-            raise ValueError("model must be 'catboost', 'tabpfn', or 'tabicl'.")
+        if self.model not in ("catboost", "tabpfn", "tabicl", "ft_transformer"):
+            raise ValueError("model must be 'catboost', 'tabpfn', 'tabicl', or 'ft_transformer'.")
         for name, domain in (
             ("train_domain", self.train_domain),
             ("validation_domain", self.validation_domain),
@@ -167,6 +171,8 @@ class ExperimentConfig:
         positive_integer(self.calibration_bins, "calibration_bins")
         if self.model == "catboost":
             positive_integer(self.early_stopping_rounds, "early_stopping_rounds")
+        elif self.model == "ft_transformer" and self.early_stopping_rounds is not None:
+            raise ValueError("ft_transformer uses patience/max_epochs/min_delta; early_stopping_rounds must be null.")
         elif self.early_stopping_rounds is not None:
             raise ValueError("Pretrained predictors do not use early_stopping_rounds; omit it or use null.")
         validate_model_params(self.model_params, self.model)

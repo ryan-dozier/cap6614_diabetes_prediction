@@ -1,6 +1,6 @@
 # Synthetic Tabular Data Under Distribution Shift
 
-This project studies how diabetes-prediction models trained on synthetic tabular data generalize across synthetic generators and to real survey data. **Original Synthetic: the 100,000-row Diabetes Health Indicators Dataset published on Kaggle by Mohan Krishna Thalla.** This is a descriptive project label, not an independently verified claim about original authorship or the complete generation history. Original Synthetic and Playground S5E12 are both synthetic; NHANES 2015–2016 is real survey data. CatBoost is the reference model. Pretrained TabPFN provides completed foundation-model comparisons; TabICLv2 is integrated and locally validated, with both initial n2000 predictive comparisons complete (M08).
+This project studies how diabetes-prediction models trained on synthetic tabular data generalize across synthetic generators and to real survey data. **Original Synthetic: the 100,000-row Diabetes Health Indicators Dataset published on Kaggle by Mohan Krishna Thalla.** This is a descriptive project label, not an independently verified claim about original authorship or the complete generation history. Original Synthetic and Playground S5E12 are both synthetic; NHANES 2015–2016 is real survey data. CatBoost is the reference model. Pretrained TabPFN provides completed foundation-model comparisons; TabICLv2 is integrated and locally validated, with both initial n2000 predictive comparisons complete (M08). FT-Transformer is an implemented and validated task-trained neural comparison with local feasibility and research configs verified (M09); predictive evaluation remains pending.
 
 | Internal ID | Display name | Dataset |
 |---|---|---|
@@ -27,7 +27,7 @@ Status as of 2026-10-26:
 | Predictive comparison reporting | Legacy four-run CatBoost/TabPFN tables and figures remain supported; six-run CatBoost/TabPFN/TabICLv2 tables and figures are implemented, validated, and merged (E04; PR #6) |
 | TabICL | Adapter, local checks, both matched n2000 none/FP32 predictive runs, and three-model comparison reporting complete (M07/M08/E04) |
 | TabICL console logging | Detailed native output retained in run logs; concise progress and warnings visible (PR #5 merged) |
-| FT-Transformer | Not implemented |
+| FT-Transformer | Implemented and validated (M09; Stage 4B acceptance 2026-10-26): both full-profile local feasibility runs and final 184-test suite passed; research configs frozen. Human review/merge not recorded; predictive runs (M10) and FT report integration remain pending |
 
 Matched n2000 CatBoost and float32 TabPFN results for both synthetic domains are complete. The Playground S5E12 results are in `results/predictive/catboost_kaggle_strict_common_16_n2000_seed42/` and `results/predictive/tabpfn_v35_kaggle_strict_common_16_n2000_float32_seed42_batch1024/`. The Original Synthetic batch-256 predictive results are complete and remain valid; rerunning them at batch 1024 is optional and only for a runtime comparison. Benchmark measurements are computational results, not additional predictive evaluations.
 
@@ -73,7 +73,7 @@ python3 --version
 
 The Python version should be 3.11.x.
 
-The environment file includes both Conda-managed packages and the pip-installed Python dependencies required by the project, including PyTorch, TabPFN, TabICL 2.2.0, CatBoost, pandas, SciPy, scikit-learn, and Matplotlib. You should not normally need to run `pip install -r requirements-local.txt` after creating the environment from `environment.yml`.
+The environment file includes both Conda-managed packages and the pip-installed Python dependencies required by the project, including PyTorch, TabPFN, TabICL 2.2.0, `rtdl-revisiting-models==0.0.2` (FT-Transformer), CatBoost, pandas, SciPy, scikit-learn, and Matplotlib. You should not normally need to run `pip install -r requirements-local.txt` after creating the environment from `environment.yml`.
 
 ### Pip Requirements
 
@@ -95,6 +95,7 @@ After activating the environment, the main dependencies can be checked with:
 python3 -c "import torch; print('PyTorch:', torch.__version__)"
 python3 -c "import tabpfn; print('TabPFN:', tabpfn.__version__)"
 python3 -c "from importlib.metadata import version; print('TabICL:', version('tabicl'))"
+python3 -c "from importlib.metadata import version; print('FT implementation:', version('rtdl-revisiting-models'))"
 python3 -c "import catboost; print('CatBoost:', catboost.__version__)"
 ```
 
@@ -251,7 +252,9 @@ CatBoost is the reference adapter. Local pretrained TabPFN classification is als
 supported for completed research runs. TabICL's explicit none/FP32 profile passed
 bounded train/validation-only local checks for both frozen n2000 contexts
 (see below); both initial n2000 predictive runs are complete (M08).
-FT-Transformer is not implemented.
+FT-Transformer's task-trained adapter and full-profile local feasibility
+are implemented and verified; its research configs passed final acceptance
+(see below). No FT predictive test-domain run has been executed.
 
 The first configuration fits **one** CatBoost model with seed 42 on Original
 Synthetic (`source`) `train`, using the same domain's `val` exclusively for
@@ -279,7 +282,8 @@ evaluation sets report ROC-AUC and average precision as JSON `null` with a warni
 inside `results/` exclusively and **refuses to reuse an existing directory**.
 Choose a new `output_dir` in the JSON configuration for every rerun. Outputs:
 
-- `config.json`: fully resolved configuration.
+- `config.json`: loader-serialized configuration (absolute output path);
+  adapter-resolved parameters are recorded separately in model metadata.
 - `metadata.json`: running/completed/failed status, UTC timestamps, schema,
   split/class counts, model/preprocessing/compute details, timings, environment
   versions, SHA-256 prepared-file fingerprints, and namespaced split identities.
@@ -292,9 +296,108 @@ Choose a new `output_dir` in the JSON configuration for every rerun. Outputs:
 - `model.tabicl_fit` and `model.adapter.json`: TabICL fitted state with embedded
   weights/context and adapter sidecar; the supported restore policy requires
   trusted artifacts and the same saved device and dependency versions.
+- `model.ft_transformer.pt`: FT-Transformer selected weights, train-fitted
+  preprocessing/schema, constructor settings, versions, and complete training
+  history/checkpoint metadata; same-device reload only.
 - `training_sample.csv.gz`: actual training context, with domain, `train` split,
   authoritative identifiers, and zero-based `sample_order` (also emitted for
   full-data runs).
+
+#### FT-Transformer: implemented and validated (M09)
+
+FT-Transformer is a **task-trained neural comparison**, not a pretrained
+foundation model. TabPFN/TabICL are pretrained comparisons and CatBoost
+remains the conventional reference. Differences in architecture, optimization,
+validation-label access, and compute mean this comparison does not isolate
+the causal effect of pretraining.
+
+The existing environment manifests pin `rtdl-revisiting-models==0.0.2`.
+Torch and the FT implementation are imported lazily when the adapter is used;
+unrelated models/config loading do not require the FT runtime. FT training
+starts from initialized weights and requires **no pretrained checkpoint
+download**. See the [verified implementation/API reference and sources](docs/ft_transformer_integration_plan.md#19-stage-1a-verified-evidence).
+
+The [Original Synthetic config](configs/ft_transformer_source_n2000.json)
+and [Playground S5E12 config](configs/ft_transformer_kaggle_n2000.json) retain
+the successful full-profile feasibility settings:
+
+- `strict_common_16`; exact matched n2000 training identities/order, model
+  and sampling seeds 42. Stage 3 verified matches against all three existing
+  baselines; no new sampling was needed to prepare these configs.
+- Train-fitted numerical standardization; sorted training-only categorical
+  vocabularies, with unseen categories aliased to each feature's training mode.
+- Three blocks, width 192, eight heads, ReGLU hidden width 256, dropout
+  0.2/0.1/0.0; AdamW parameter groups, learning rate 1e-4, weight decay 1e-5.
+- Training batch 256; complete fixed same-domain validation every epoch in
+  batches of 1024. Restore the highest raw validation ROC-AUC checkpoint;
+  exact ties retain the earliest epoch. Validation labels count as additional
+  model-selection access, so matched training rows do not imply equal label access.
+- Maximum 200 epochs; patience 20, `min_delta=0.001` affects patience only.
+  `early_stopping_rounds=null` is separate from CatBoost's stopping setting.
+  Explicit float32 and `cuda:0`; no automatic CPU/precision/batch fallback.
+
+**Ready-to-run commands; not completed experiments.** Stage 4B configuration
+and implementation acceptance passed. From the project root with
+`synthetic-tabular-ai` active:
+
+```bash
+python3 -m src.experiments.runner \
+  --config configs/ft_transformer_source_n2000.json
+
+python3 -m src.experiments.runner \
+  --config configs/ft_transformer_kaggle_n2000.json
+```
+
+These will train on the named domain and evaluate Original Synthetic
+(`source`), Playground S5E12 (`kaggle`), and NHANES 2015–2016 (`nhanes`).
+Intended output directories (unused when Stage 4A was validated):
+
+```text
+results/predictive/ft_transformer_source_strict_common_16_n2000_float32_seed42/
+results/predictive/ft_transformer_kaggle_strict_common_16_n2000_float32_seed42/
+```
+
+Every execution requires a fresh directory; choose a distinct output name
+for reruns, never reuse or delete completed results. Source JSON retains
+the explicit requested settings; the loader canonicalizes the output path,
+and adapter-resolved settings appear in `metadata.json` and the saved model.
+Unlike smoke mode, the predictive runner has no mode/epoch override.
+
+Outputs include the model/preprocessing artifact above, full epoch history,
+selected/executed epochs and stopping reason in artifact and model metadata,
+plus shared predictions, metrics, calibration, training identities/hashes,
+prepared-file fingerprints, fit/prediction timings, environment and resource
+metadata. Console training progress is concise (first/periodic/final epochs),
+not per batch. Resource snapshots retain their operation/reset scope:
+later prediction allocator snapshots are not fit peaks or total GPU/process
+memory. Detailed operation-specific fit peaks are in the smoke evidence.
+Reload requires the same saved device and supported exact runtime versions.
+Predictive runs **retrain**: there is no runner checkpoint-reuse/resume mode.
+
+Local Stage 3D observations on the RTX 4060 Laptop GPU:
+
+| Training domain | Train / full validation | Executed / selected epochs | Stop | Fit / workflow elapsed |
+|---|---:|---:|---|---:|
+| Original Synthetic | 2,000 / 15,000 | 23 / 3 | Patience | 26.75 / 33.80 s |
+| Playground S5E12 | 2,000 / 105,000 | 29 / 13 | Patience | 78.18 / 90.47 s |
+
+Both had fit allocator peaks of 182.82 MiB allocated / 290 MiB reserved.
+Same-device save/reload passed, and independent full-validation AUC/BCE
+recomputation exactly reproduced each selected checkpoint. These are local
+observations for the executed patience-based policy, not 200-epoch timing
+guarantees, convergence evidence, or held-out test performance. See
+[complete Stage 3 evidence](docs/ft_transformer_stage3_results.md#stage-3d-full-profile-local-feasibility)
+and the [integration plan](docs/ft_transformer_integration_plan.md).
+FT predictive results and reporting integration remain pending; existing
+CatBoost/TabPFN/TabICL reports do not yet include FT-Transformer.
+Stage 4B final validation passed 184 repository tests with no skips,
+`pip check`, manifest pin checks, and research/smoke configuration checks.
+See the [final review and acceptance record](docs/ft_transformer_integration_plan.md#21-stage-4b-final-review-and-acceptance)
+for the artifact-validation corrections and evidence scope. This is
+automated technical acceptance, not a claim of human review or merge.
+Detailed evidence documents are tracked in Git, but their linked
+`results/` outputs and saved checkpoints are ignored local artifacts and
+are not supplied by cloning the repository.
 
 #### Fixed-seed predictive comparison report
 

@@ -1,6 +1,6 @@
 # Synthetic Tabular Data Under Distribution Shift
 
-This project studies how diabetes-prediction models trained on synthetic tabular data generalize across synthetic generators and to real survey data. **Original Synthetic: the 100,000-row Diabetes Health Indicators Dataset published on Kaggle by Mohan Krishna Thalla.** This is a descriptive project label, not an independently verified claim about original authorship or the complete generation history. Original Synthetic and Playground S5E12 are both synthetic; NHANES 2015–2016 is real survey data. CatBoost is the reference model. Pretrained TabPFN provides completed foundation-model comparisons; TabICLv2 is integrated and locally validated, with both initial n2000 predictive comparisons complete (M08). FT-Transformer is an implemented and validated task-trained neural comparison with local feasibility and research configs verified (M09); predictive evaluation remains pending.
+This project studies how diabetes-prediction models trained on synthetic tabular data generalize across synthetic generators and to real survey data. **Original Synthetic: the 100,000-row Diabetes Health Indicators Dataset published on Kaggle by Mohan Krishna Thalla.** This is a descriptive project label, not an independently verified claim about original authorship or the complete generation history. Original Synthetic and Playground S5E12 are both synthetic; NHANES 2015–2016 is real survey data. CatBoost is the reference model. Pretrained TabPFN provides completed foundation-model comparisons; TabICLv2 is integrated and locally validated, with both initial n2000 predictive comparisons complete (M08). FT-Transformer is an implemented and validated task-trained neural comparison (M09); both frozen n2000 seed-42 predictive runs and their artifact validation are complete (M10). FT automated reporting integration remains pending.
 
 | Internal ID | Display name | Dataset |
 |---|---|---|
@@ -27,7 +27,7 @@ Status as of 2026-10-26:
 | Predictive comparison reporting | Legacy four-run CatBoost/TabPFN tables and figures remain supported; six-run CatBoost/TabPFN/TabICLv2 tables and figures are implemented, validated, and merged (E04; PR #6) |
 | TabICL | Adapter, local checks, both matched n2000 none/FP32 predictive runs, and three-model comparison reporting complete (M07/M08/E04) |
 | TabICL console logging | Detailed native output retained in run logs; concise progress and warnings visible (PR #5 merged) |
-| FT-Transformer | Implemented and validated (M09; Stage 4B acceptance 2026-10-26): both full-profile local feasibility runs and final 184-test suite passed; research configs frozen. Merged through [PR #7](https://github.com/ryan-dozier/cap6614_diabetes_prediction/pull/7) on 2026-10-27; predictive runs (M10) and FT report integration remain pending |
+| FT-Transformer | M09 implemented, validated, and merged through [PR #7](https://github.com/ryan-dozier/cap6614_diabetes_prediction/pull/7) on 2026-10-27. Both frozen n2000 seed-42 predictive runs and artifact validation complete (M10); [results review](docs/ft_transformer_predictive_results.md). FT automated report integration remains pending |
 
 Matched n2000 CatBoost and float32 TabPFN results for both synthetic domains are complete. The Playground S5E12 results are in `results/predictive/catboost_kaggle_strict_common_16_n2000_seed42/` and `results/predictive/tabpfn_v35_kaggle_strict_common_16_n2000_float32_seed42_batch1024/`. The Original Synthetic batch-256 predictive results are complete and remain valid; rerunning them at batch 1024 is optional and only for a runtime comparison. Benchmark measurements are computational results, not additional predictive evaluations.
 
@@ -255,7 +255,8 @@ bounded train/validation-only local checks for both frozen n2000 contexts
 (see below); both initial n2000 predictive runs are complete (M08).
 FT-Transformer's task-trained adapter and full-profile local feasibility
 are implemented and verified; its research configs passed final acceptance
-(see below). No FT predictive test-domain run has been executed.
+(see below). Both frozen n2000 seed-42 predictive runs are complete and their
+saved artifacts validated; see the [FT results review](docs/ft_transformer_predictive_results.md).
 
 The first configuration fits **one** CatBoost model with seed 42 on Original
 Synthetic (`source`) `train`, using the same domain's `val` exclusively for
@@ -304,7 +305,7 @@ Choose a new `output_dir` in the JSON configuration for every rerun. Outputs:
   authoritative identifiers, and zero-based `sample_order` (also emitted for
   full-data runs).
 
-#### FT-Transformer: implemented, validated, and merged (M09)
+#### FT-Transformer: implementation accepted (M09), predictive runs validated (M10)
 
 FT-Transformer is a **task-trained neural comparison**, not a pretrained
 foundation model. TabPFN/TabICL are pretrained comparisons and CatBoost
@@ -337,9 +338,9 @@ the successful full-profile feasibility settings:
   `early_stopping_rounds=null` is separate from CatBoost's stopping setting.
   Explicit float32 and `cuda:0`; no automatic CPU/precision/batch fallback.
 
-**Ready-to-run commands; not completed experiments.** Stage 4B configuration
-and implementation acceptance passed. From the project root with
-`synthetic-tabular-ai` active:
+**Both commands below were executed by Ryan Dozier; saved artifacts passed
+post-run validation (M10).** These are the frozen execution commands, not a
+request to rerun. From the project root with `synthetic-tabular-ai` active:
 
 ```bash
 python3 -m src.experiments.runner \
@@ -349,9 +350,9 @@ python3 -m src.experiments.runner \
   --config configs/ft_transformer_kaggle_n2000.json
 ```
 
-These will train on the named domain and evaluate Original Synthetic
+These train on the named domain and evaluate Original Synthetic
 (`source`), Playground S5E12 (`kaggle`), and NHANES 2015–2016 (`nhanes`).
-Intended output directories (unused when Stage 4A was validated):
+Completed output directories (unused at historical Stage 4A validation):
 
 ```text
 results/predictive/ft_transformer_source_strict_common_16_n2000_float32_seed42/
@@ -375,7 +376,8 @@ memory. Detailed operation-specific fit peaks are in the smoke evidence.
 Reload requires the same saved device and supported exact runtime versions.
 Predictive runs **retrain**: there is no runner checkpoint-reuse/resume mode.
 
-Local Stage 3D observations on the RTX 4060 Laptop GPU:
+Historical local Stage 3D feasibility observations on the RTX 4060 Laptop GPU
+(not predictive-run timings):
 
 | Training domain | Train / full validation | Executed / selected epochs | Stop | Fit / workflow elapsed |
 |---|---:|---:|---|---:|
@@ -389,9 +391,16 @@ observations for the executed patience-based policy, not 200-epoch timing
 guarantees, convergence evidence, or held-out test performance. See
 [complete Stage 3 evidence](docs/ft_transformer_stage3_results.md#stage-3d-full-profile-local-feasibility)
 and the [integration plan](docs/ft_transformer_integration_plan.md).
-FT predictive results and reporting integration remain pending; existing
+The [predictive results review](docs/ft_transformer_predictive_results.md)
+records six FT metric rows, explicit matched-baseline comparisons, full-precision
+metric recomputation, identity/provenance checks, and actual predictive timings.
+Predictive fits took 16.79 s (source) / 53.60 s (Playground); totals were
+31.98 / 66.43 s. Source-trained FT had higher NHANES AUC/AP, while
+Playground-trained FT had lower Brier and higher F1@0.5; these measure different
+properties and are descriptive single-seed results, not statistical superiority.
+FT automated reporting integration remains pending; existing
 CatBoost/TabPFN/TabICL reports do not yet include FT-Transformer.
-Stage 4B final validation passed 184 repository tests with no skips,
+Historical Stage 4B final validation passed 184 repository tests with no skips,
 `pip check`, manifest pin checks, and research/smoke configuration checks.
 See the [final review and acceptance record](docs/ft_transformer_integration_plan.md#21-stage-4b-final-review-and-acceptance)
 for the artifact-validation corrections and evidence scope. This is

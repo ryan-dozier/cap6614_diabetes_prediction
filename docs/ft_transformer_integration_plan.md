@@ -1,10 +1,15 @@
 # FT-Transformer integration plan
 
-Status: Stage 4B technical acceptance passed — M09 implemented and validated; M10 predictive evaluation pending
+Status: M09 implemented, validated, and merged; both frozen n2000 seed-42 predictive runs and artifact validation complete (M10); FT automated reporting integration pending
 Owner: Ryan Dozier
 Stage 1A/1B design prepared by: AI assistant using Copilot SDK in VS Code
 Reviewed by: Not yet human-reviewed
-Last updated: 2026-10-26
+Last updated: 2026-10-27
+
+Current predictive evidence: [M10 results and artifact review](ft_transformer_predictive_results.md).
+M09 merged through PR #7. The stage-by-stage records below retain their
+historical scope and pending statuses at the time; they do not supersede this
+current status. No new human review is inferred from the automated M10 audit.
 
 ## 1. Purpose and research role
 

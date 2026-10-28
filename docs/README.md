@@ -29,6 +29,7 @@ Instructions for current workflows:
 Design decisions and implementation-stage acceptance records. Historical sections
 retain their original scope; use each document's current-status notes.
 
+- [Research questions and hypotheses — approved (R04)](plans/research_questions.md)
 - [FT-Transformer integration plan](plans/ft_transformer_integration_plan.md)
 - [TabICL integration plan](plans/tabicl_integration_plan.md)
 

@@ -1,15 +1,15 @@
 # R05 source and citation inventory
 
 Prepared: October 28, 2026.
-Status: **Initial sourcing checklist; related-work review and bibliography incomplete.**
+Status: **Bibliography expanded October 30, 2026; critical related-work review remains incomplete.**
 Owner: Ryan Dozier. Prepared with AI assistance.
 Scope: the [approved research questions](research_questions.md), implemented model
 profiles, three project datasets, and methods needed to design R06/E05/X01.
 
 An identified source is not a completed critical review. The unchecked items below
 require reading, extracting supported claims and limitations, and adding verified
-bibliographic metadata. Suggested citation keys are provisional; no BibTeX file
-has been created by this inventory.
+bibliographic metadata. Suggested citation keys are provisional; the BibTeX file is located in the
+[bibliography](../paper/references.bib).
 
 ## 1. Implemented models: required sources
 
@@ -23,7 +23,7 @@ has been created by this inventory.
 
 - [ ] Read the method papers and write a short comparison of training/context,
       external pretraining, validation-label access, and adaptation support.
-- [ ] Cite official software/checkpoint records as well as papers where exact
+- [x] Cite official software/checkpoint records as well as papers where exact
       version, local preprocessing, query batching, or persistence matters.
 - [ ] Separate claims about the published default from our nondefault profiles:
       especially TabICL none-normalization/FP32/uncached and the documented
@@ -143,3 +143,23 @@ The initial pass should prioritize the implemented models, three data sources,
 synthetic-utility/shift work, and the closest adaptation/mitigation papers.
 R05 is complete only after those sources are critically compared, a bibliography
 is prepared, and the research gap informs R06. A list of URLs alone is insufficient.
+
+
+## Bibliography update: October 30, 2026
+
+The bibliography now includes the TabPFN-3.5 report/model card, all 14 component
+codebooks referenced by the NHANES preparation script, the CDC analytic-guidelines
+index, Failing Loudly, and sources on fine-tuning, discriminative covariate-shift
+adaptation, proper scoring rules, bootstrap foundations, and benchmark variance.
+
+Additional reading candidates are rubachev2025finetuning (TabPFNv2 fine-tuning;
+not evidence of synthetic-to-NHANES few-shot transfer) and bickel2009covariateshift
+(domain-discriminative adaptation under covariate-shift assumptions; not an
+artifact-specific tabular mitigation method). The scoring-rule, bootstrap, and
+benchmark-variance sources provide starting points, not a final E05 protocol.
+
+Adding entries does not complete the unchecked reading, mapping-audit, novelty,
+or protocol tasks above. The closest artifact-aware tabular mitigation literature,
+feature-statistic citations, and method-specific sources still need selection as
+R06/E05/X01 develop. Cite component codebooks according to the actual cohort and
+retained measurements. TRIGLY_I is relevant to lipid sensitivity analyses.

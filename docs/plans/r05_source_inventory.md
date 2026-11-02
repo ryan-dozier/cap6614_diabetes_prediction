@@ -13,13 +13,16 @@ bibliographic metadata. Suggested citation keys are provisional; the BibTeX file
 
 ## 1. Implemented models: required sources
 
+- [x] Save bibliography entries for the four implemented model papers and the
+      TabPFN-3.5 technical report/model card (October 30, 2026).
+
 | Topic / suggested key | Primary source to read and cite | What it should support |
 |---|---|---|
 | TabPFN foundations: `hollmann2025tabpfn` | Hollmann et al., [Accurate predictions on small data with a tabular foundation model](https://www.nature.com/articles/s41586-024-08328-6), Nature, 2025 | Synthetic-task pretraining, in-context prediction, and the foundation-model framing. This paper alone does not document our v3.5 checkpoint. |
 | Exact TabPFN generation: `priorlabs2026tabpfn35` | Prior Labs, [TabPFN-3.5 technical report](https://priorlabs.ai/technical-reports/tabpfn-3-5), September 2026; [model card](https://huggingface.co/Prior-Labs/tabpfn_3_5) | Generation-specific architecture/protocol and weight access/license. Record the exact local checkpoint revision/hash separately. |
 | TabICLv2: `qu2026tabiclv2` | Qu et al., [TabICLv2: A better, faster, scalable, and open tabular foundation model](https://arxiv.org/abs/2602.11139), 2026 | Synthetic pretraining, in-context learning, and v2 architectural/training changes. Cite the paper version actually read. |
 | FT-Transformer: `gorishniy2021fttransformer` | Gorishniy et al., [Revisiting Deep Learning Models for Tabular Data](https://arxiv.org/abs/2106.11959), NeurIPS 2021; [author implementation](https://github.com/yandex-research/rtdl-revisiting-models) | Feature tokenization, task-trained transformer baseline, and implementation provenance. Record our pinned rtdl-revisiting-models 0.0.2 profile. |
-| CatBoost: `prokhorenkova2018catboost` | Prokhorenkova et al., [CatBoost: unbiased boosting with categorical features](https://proceedings.neurips.cc/paper_files/paper/2018/hash/14491b756b3a51daac41c24863285549-Abstract.html), NeurIPS 2018 | Conventional reference model, ordered boosting, and categorical handling. |
+| CatBoost: `ProkhorenkovaCatBoost` | Prokhorenkova et al., [CatBoost: unbiased boosting with categorical features](https://proceedings.neurips.cc/paper_files/paper/2018/hash/14491b756b3a51daac41c24863285549-Abstract.html), NeurIPS 2018 | Conventional reference model, ordered boosting, and categorical handling. |
 
 - [ ] Read the method papers and write a short comparison of training/context,
       external pretraining, validation-label access, and adaptation support.
@@ -33,10 +36,16 @@ bibliographic metadata. Suggested citation keys are provisional; the BibTeX file
 
 ## 2. Dataset sources: required citations and provenance
 
+- [x] Save citations for Original Synthetic, Playground S5E12, and NHANES 2015–2016.
+- [x] Save DIQ_I and the other 13 component codebooks referenced by the preparation
+      script, plus the CDC analytic-guidelines index.
+- [ ] Verify remaining Kaggle publication/version metadata and access conditions;
+      complete dataset-specific provenance and mapping review below.
+
 | Source / suggested key | Primary reference | Required record |
 |---|---|---|
 | Original Synthetic: `thallaDiabetesDataset` | [Kaggle Diabetes Health Indicators Dataset](https://www.kaggle.com/datasets/mohankrishnathalla/diabetes-health-indicators-dataset) | Publisher as displayed, title, URL, available version/update date, actual access date, license/access conditions, filename, and verified raw SHA-256. |
-| Playground S5E12: `kaggle2025s5e12` | [Competition data page](https://www.kaggle.com/competitions/playground-series-s5e12/data) and its linked overview/rules | Organizer/title, labeled train.csv, available release/version information, generation description, access conditions, and raw-file hash. |
+| Playground S5E12: `kaggleS5E12` | [Competition data page](https://www.kaggle.com/competitions/playground-series-s5e12/data) and its linked overview/rules | Organizer/title, labeled train.csv, available release/version information, generation description, access conditions, and raw-file hash. |
 | NHANES 2015–2016: `cdcNhanes2015_2016` | [CDC cycle documentation](https://wwwn.cdc.gov/nchs/nhanes/continuousnhanes/default.aspx?BeginYear=2015) | CDC/NCHS dataset citation, cycle, downloaded component files, access dates, and public-use conditions. |
 | NHANES target: `cdcDiqI` | [DIQ_I diabetes questionnaire codebook](https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2015/DataFiles/DIQ_I.htm) | Exact DIQ010 question, response codes, exclusions, and how the script maps it to diagnosed_diabetes. Distinguish reported diagnosis from lab-defined diabetes. |
 | NHANES measurement and survey design | [CDC analytic guidelines](https://wwwn.cdc.gov/nchs/nhanes/analyticguidelines.aspx) plus the codebook for each component actually used | Measurement definitions, eligible ages, units, skip patterns, missingness, participant linkage, examination/fasting subsamples, and applicable weights/design variables. |
@@ -66,6 +75,13 @@ related Hugging Face dataset as the acquired file.
 
 ## 3. Approaches and evaluation: source checklist
 
+- [x] Save the listed starting sources for synthetic utility, shift detection,
+      tree/neural baselines, covariate/label shift, calibration, ROC/PR/AP,
+      feature-removal controls, and paired ROC-AUC uncertainty.
+- [x] Add initial adaptation reading candidates: Rubachev et al. (2025) on
+      tabular foundation-model fine-tuning and Bickel et al. (2009) on
+      discriminative covariate-shift adaptation.
+
 | Topic | Starting source | Why it is needed / boundary |
 |---|---|---|
 | Synthetic fidelity versus downstream utility (RQ1/RQ4) | Hansen et al., [Reimagining Synthetic Tabular Data Generation through Data-Centric AI: A Comprehensive Benchmark](https://papers.nips.cc/paper/2023/hash/6aa9a05b929fb08ff46a58cab6cf860d-Abstract-Datasets_and_Benchmarks.html), NeurIPS 2023 | Motivate studying predictive utility and feature relationships rather than marginal similarity alone. Its scope does not establish our method's novelty. |
@@ -89,11 +105,19 @@ The following source needs are still open; identifying them is part of R05:
       domain-aware feature/context selection and density-ratio/sample weighting;
       compare to ordinary feature selection and random controls. This is the key
       search needed to justify R06.
-- [ ] **Proper scoring rules / Brier and log loss:** source their interpretation
-      and the distinction between probability error and calibration alone.
-- [ ] **Paired bootstrap and repeated-run analysis:** source participant-level
-      resampling, training/sampling variability, uncertainty reporting, and
-      multiplicity. Select methods under E05 rather than assuming DeLong suffices.
+- [x] **Proper scoring rules / Brier and log loss:** add a foundational source
+      for their interpretation and the distinction between probability error
+      and calibration alone: Gneiting and Raftery (2007),
+      `gneiting2007properscoring`.
+- [ ] Read the scoring-rule source and write the project-specific metric
+      interpretation; adding the citation does not complete that review.
+- [x] **Bootstrap and repeated-run foundations:** add Efron (1979),
+      `efron1979bootstrap`, and Bouthillier et al. (2021),
+      `bouthillier2021variance`.
+- [ ] **Paired bootstrap and repeated-run protocol:** review participant-level
+      resampling, training/sampling variability, uncertainty reporting, survey
+      design, and multiplicity; add method-specific sources as needed. Select
+      methods under E05 rather than assuming the foundational citations suffice.
 - [ ] **Feature-level shift statistics:** document the definitions/software used
       for KS, standardized mean difference, Wasserstein distance, categorical
       total variation, and Jensen–Shannon distance/divergence. Cite a methods
@@ -123,10 +147,14 @@ deferred, and this inventory does not select any additional model.
 
 ## 5. Record for each reviewed source
 
-- [ ] Verify authors, title, venue/year, paper version, DOI or stable URL, and
-      software/checkpoint revision when relevant.
-- [ ] Save a verified BibTeX entry; distinguish papers, technical reports, model
-      cards, software releases, and datasets.
+- [x] Review and clean the current 40 BibTeX entries, including authors, titles,
+      available venue/year/version metadata, DOI/stable URLs, entry types,
+      duplicate keys, and formatting.
+- [x] Save the current paper, technical-report, model-card, dataset/codebook,
+      and software-documentation citations in the shared bibliography.
+- [ ] Verify bibliographic metadata for any further sources selected during
+      reading; finish missing dataset publication metadata and any exact
+      software/checkpoint revision citations required by final claims.
 - [ ] Write 2–4 sentences on the supported claim, method, data/evaluation scope,
       limitations, and relevance to an R04 question.
 - [ ] Record how it differs from our proposed intervention; identify missing
@@ -144,8 +172,10 @@ synthetic-utility/shift work, and the closest adaptation/mitigation papers.
 R05 is complete only after those sources are critically compared, a bibliography
 is prepared, and the research gap informs R06. A list of URLs alone is insufficient.
 
-
 ## Bibliography update: October 30, 2026
+
+Bibliography sourcing and cleanup: Ryan Dozier, with AI assistance.
+Completed checkboxes record sourcing work; they do not imply the papers were read.
 
 The bibliography now includes the TabPFN-3.5 report/model card, all 14 component
 codebooks referenced by the NHANES preparation script, the CDC analytic-guidelines

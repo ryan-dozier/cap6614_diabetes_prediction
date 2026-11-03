@@ -24,22 +24,28 @@ bibliographic metadata. Suggested citation keys are provisional; the BibTeX file
 | FT-Transformer: `gorishniy2021fttransformer` | Gorishniy et al., [Revisiting Deep Learning Models for Tabular Data](https://arxiv.org/abs/2106.11959), NeurIPS 2021; [author implementation](https://github.com/yandex-research/rtdl-revisiting-models) | Feature tokenization, task-trained transformer baseline, and implementation provenance. Record our pinned rtdl-revisiting-models 0.0.2 profile. |
 | CatBoost: `ProkhorenkovaCatBoost` | Prokhorenkova et al., [CatBoost: unbiased boosting with categorical features](https://proceedings.neurips.cc/paper_files/paper/2018/hash/14491b756b3a51daac41c24863285549-Abstract.html), NeurIPS 2018 | Conventional reference model, ordered boosting, and categorical handling. |
 
-- [ ] Read the method papers and write a short comparison of training/context,
+- [x] Read the method papers and write a short comparison of training/context,
       external pretraining, validation-label access, and adaptation support.
 - [x] Cite official software/checkpoint records as well as papers where exact
       version, local preprocessing, query batching, or persistence matters.
-- [ ] Separate claims about the published default from our nondefault profiles:
+- [x] Separate claims about the published default from our nondefault profiles:
       especially TabICL none-normalization/FP32/uncached and the documented
       TabPFN float32 batch settings.
-- [ ] Do not use a publication's benchmark ranking as evidence of superiority on
+- [x] Do not use a publication's benchmark ranking as evidence of superiority on
       our domains or as a causal comparison of pretraining.
+
+The [model comparison draft](r05_model_comparison.md), prepared November 2, 2026,
+records these distinctions and their experimental implications.
+- [x] Create the model-comparison draft with local configuration/source links.
+- [x] Review the draft and reconciles it with his paper-reading notes,
+      including generation-specific TabPFN-3.5 details.
 
 ## 2. Dataset sources: required citations and provenance
 
 - [x] Save citations for Original Synthetic, Playground S5E12, and NHANES 2015–2016.
 - [x] Save DIQ_I and the other 13 component codebooks referenced by the preparation
       script, plus the CDC analytic-guidelines index.
-- [ ] Verify remaining Kaggle publication/version metadata and access conditions;
+- [x] Verify remaining Kaggle publication/version metadata and access conditions;
       complete dataset-specific provenance and mapping review below.
 
 | Source / suggested key | Primary reference | Required record |

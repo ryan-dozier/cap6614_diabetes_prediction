@@ -31,6 +31,7 @@ retain their original scope; use each document's current-status notes.
 
 - [Research questions and hypotheses — approved (R04)](plans/research_questions.md)
 - [Source and citation inventory — in progress (R05)](plans/r05_source_inventory.md)
+- [Implemented-model comparison — draft for review (R05)](plans/r05_model_comparison.md)
 - [FT-Transformer integration plan](plans/ft_transformer_integration_plan.md)
 - [TabICL integration plan](plans/tabicl_integration_plan.md)
 

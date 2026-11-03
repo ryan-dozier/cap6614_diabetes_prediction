@@ -135,6 +135,19 @@ The following source needs are still open; identifying them is part of R05:
       selected for E07; do not promise an attribution method merely because it
       appeared in an earlier proposal.
 
+### Reviewed adaptation and mitigation draft
+
+- [x] Compare primary studies on augmentation, fine-tuning, context retrieval,
+      weighting, shift detection, and feature removal.
+- [x] Record the proposed empirical contribution, candidate interventions,
+      and their comparison controls.
+- [x] Ryan Dozier reviewed the draft and approved moving forward on November 3,
+      2026. Candidate A is the core experiment and Candidate B is a bounded
+      follow-up.
+
+Evidence is in the [adaptation and mitigation review](r05_adaptation_mitigation_review.md).
+Detailed protocol checks and final paper citations remain open.
+
 ## 4. Optional background: does not expand implementation scope
 
 - SAINT: [paper](https://arxiv.org/abs/2106.01342). Read/cite if explaining its

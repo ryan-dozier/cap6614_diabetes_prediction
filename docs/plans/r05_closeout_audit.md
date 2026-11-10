@@ -7,6 +7,27 @@ Ryan approved the model comparison, adaptation review (November 3), related-work
 draft, and shift/evaluation discussion (November 9). This closeout records those
 approvals; it does not claim approval of a finalized experimental protocol.
 
+
+## Git and merge record
+
+Merged through [PR #10](https://github.com/ryan-dozier/cap6614_diabetes_prediction/pull/10) on 2026-11-10 (America/New_York), merge [b0b14ee](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/b0b14ee); final documentation commit [7dce7f8](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/7dce7f8).
+The November 9 review date is distinct from the November 10 commit/merge date.
+All six branch commits are ancestors of the verified merge. Local main matched
+origin/main with a clean worktree before this documentation follow-up.
+
+| Stage | Commit | Commit date (America/New_York) |
+| --- | --- | --- |
+| Initial source inventory | [dc03f60](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/dc03f60) | 2026-10-28 |
+| Bibliography creation and cleanup | [18dc347](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/18dc347) | 2026-10-30 |
+| Additional sources and inventory progress | [69afe57](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/69afe57) | 2026-11-02 |
+| Implemented-model comparison | [83af935](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/83af935) | 2026-11-02 |
+| Adaptation and mitigation review | [7fc6e6d](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/7fc6e6d) | 2026-11-03 |
+| Reviewed paper drafts and R05 closeout | [7dce7f8](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/7dce7f8) | 2026-11-10 |
+
+Authorship is recorded as ryan-dozier/Ryan Dozier. Draft-review attribution follows
+Ryan's explicit confirmations; Git authorship alone does not establish review.
+The ignored personal checklist is a local record and was not included in PR #10.
+
 ## Evidence and checks
 
 - [Model comparison](r05_model_comparison.md): separates paper contributions,

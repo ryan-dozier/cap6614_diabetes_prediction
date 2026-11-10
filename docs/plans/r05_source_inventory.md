@@ -4,6 +4,7 @@ Prepared: October 28, 2026.
 Status: **R05 complete for the planning milestone, November 9, 2026.**
 Ryan Dozier approved the related-work and shift/evaluation drafts. See the
 [closeout audit](r05_closeout_audit.md) for checks, boundaries, and later tasks.
+Merged through [PR #10](https://github.com/ryan-dozier/cap6614_diabetes_prediction/pull/10) on 2026-11-10 (America/New_York), merge [b0b14ee](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/b0b14ee); final documentation commit [7dce7f8](https://github.com/ryan-dozier/cap6614_diabetes_prediction/commit/7dce7f8).
 Owner: Ryan Dozier. Prepared with AI assistance.
 Scope: the [approved research questions](research_questions.md), implemented model
 profiles, three project datasets, and methods needed to design R06/E05/X01.

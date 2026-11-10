@@ -178,7 +178,8 @@ participants does not create a newly unseen confirmatory test.
 - [x] Record explicit local profiles and distinguish them from paper-level claims.
 - [x] Identify comparison limitations and candidate adaptation interfaces.
 - [ ] Reconcile any resulting corrections with the final report's methods section.
-- [ ] Critically compare the closest few-shot adaptation and artifact-aware
-      mitigation papers before selecting the R06 contribution.
+- [x] Compare the selected adaptation and mitigation papers in the reviewed
+      [adaptation review](r05_adaptation_mitigation_review.md).
 
-This document does not mark R05, R06, or the final related-work section complete.
+R05 closeout is recorded in the [citation audit](r05_closeout_audit.md).
+R06 and the final report remain separate tasks.

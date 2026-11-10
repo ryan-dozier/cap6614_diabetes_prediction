@@ -1,14 +1,16 @@
 # R05 source and citation inventory
 
 Prepared: October 28, 2026.
-Status: **Bibliography expanded October 30, 2026; critical related-work review remains incomplete.**
+Status: **R05 complete for the planning milestone, November 9, 2026.**
+Ryan Dozier approved the related-work and shift/evaluation drafts. See the
+[closeout audit](r05_closeout_audit.md) for checks, boundaries, and later tasks.
 Owner: Ryan Dozier. Prepared with AI assistance.
 Scope: the [approved research questions](research_questions.md), implemented model
 profiles, three project datasets, and methods needed to design R06/E05/X01.
 
-An identified source is not a completed critical review. The unchecked items below
-require reading, extracting supported claims and limitations, and adding verified
-bibliographic metadata. Suggested citation keys are provisional; the BibTeX file is located in the
+An identified source is not a completed critical review. Unchecked items retained below are follow-up work assigned in the closeout
+audit to D07, E05, E07, R06/X01, or final report preparation; they do not reopen
+the completed initial review. Suggested citation keys are provisional; the BibTeX file is located in the
 [bibliography](../paper/references.bib).
 
 ## 1. Implemented models: required sources
@@ -37,14 +39,15 @@ bibliographic metadata. Suggested citation keys are provisional; the BibTeX file
 The [model comparison draft](r05_model_comparison.md), prepared November 2, 2026,
 records these distinctions and their experimental implications.
 - [x] Create the model-comparison draft with local configuration/source links.
-- [x] Review the draft and reconciles it with his paper-reading notes,
+- [x] Review the draft and reconcile it with paper-reading notes,
       including generation-specific TabPFN-3.5 details.
 
 ## 2. Dataset sources: required citations and provenance
 
 - [x] Save citations for Original Synthetic, Playground S5E12, and NHANES 2015–2016.
-- [x] Save DIQ_I and the other 13 component codebooks referenced by the preparation
-      script, plus the CDC analytic-guidelines index.
+- [x] Identify DIQ_I, preparation-component codebooks, and the CDC guidelines.
+      The bibliography was subsequently streamlined to the main NHANES citation;
+      component links remain supporting documentation for D07.
 - [x] Verify remaining Kaggle publication/version metadata and access conditions;
       complete dataset-specific provenance and mapping review below.
 
@@ -53,13 +56,13 @@ records these distinctions and their experimental implications.
 | Original Synthetic: `thallaDiabetesDataset` | [Kaggle Diabetes Health Indicators Dataset](https://www.kaggle.com/datasets/mohankrishnathalla/diabetes-health-indicators-dataset) | Publisher as displayed, title, URL, available version/update date, actual access date, license/access conditions, filename, and verified raw SHA-256. |
 | Playground S5E12: `kaggleS5E12` | [Competition data page](https://www.kaggle.com/competitions/playground-series-s5e12/data) and its linked overview/rules | Organizer/title, labeled train.csv, available release/version information, generation description, access conditions, and raw-file hash. |
 | NHANES 2015–2016: `cdcNhanes2015_2016` | [CDC cycle documentation](https://wwwn.cdc.gov/nchs/nhanes/continuousnhanes/default.aspx?BeginYear=2015) | CDC/NCHS dataset citation, cycle, downloaded component files, access dates, and public-use conditions. |
-| NHANES target: `cdcDiqI` | [DIQ_I diabetes questionnaire codebook](https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2015/DataFiles/DIQ_I.htm) | Exact DIQ010 question, response codes, exclusions, and how the script maps it to diagnosed_diabetes. Distinguish reported diagnosis from lab-defined diabetes. |
+| NHANES target: component documentation link (no current BibTeX key) | [DIQ_I diabetes questionnaire codebook](https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2015/DataFiles/DIQ_I.htm) | Exact DIQ010 question, response codes, exclusions, and how the script maps it to diagnosed_diabetes. Distinguish reported diagnosis from lab-defined diabetes. |
 | NHANES measurement and survey design | [CDC analytic guidelines](https://wwwn.cdc.gov/nchs/nhanes/analyticguidelines.aspx) plus the codebook for each component actually used | Measurement definitions, eligible ages, units, skip patterns, missingness, participant linkage, examination/fasting subsamples, and applicable weights/design variables. |
 
-Kaggle URLs resolved during this inventory, but their page bodies were not
-extractable by the browsing tool. Reopen them in a browser to verify displayed
-metadata and terms; this inventory does not certify their license or reproduce
-the generation description. The Original Synthetic acquisition/hash verification
+Kaggle metadata review is recorded as completed in Ryan Dozier\'s personal
+checklist. The browsing tool did not independently extract the page bodies;
+this closeout does not newly certify access/license conditions. Preserve the
+supporting provenance evidence under D07. The Original Synthetic acquisition/hash verification
 is existing local evidence, not newly performed here. Its exact acquisition URL
 does not establish every upstream author or generation step. Do not cite the
 related Hugging Face dataset as the acquired file.
@@ -101,22 +104,22 @@ related Hugging Face dataset as the acquired file.
 | Feature-removal and retraining controls (RQ4) | Hooker et al., [A Benchmark for Interpretability Methods in Deep Neural Networks](https://proceedings.neurips.cc/paper_files/paper/2019/hash/fe4b8556000d0f0cae99daa5c5c5a410-Abstract.html), NeurIPS 2019 | Background on evaluating removal-based claims and retraining. This is not a tabular synthetic-transfer method; find closer related work before choosing our intervention. |
 | Paired ROC-AUC uncertainty | DeLong et al., [Comparing the areas under two or more correlated receiver operating characteristic curves](https://pubmed.ncbi.nlm.nih.gov/3203132/), Biometrics 1988 | Candidate paired-AUC method. Does not account for training-seed variation or settle survey-design inference. Final choice belongs to E05. |
 
-The following source needs are still open; identifying them is part of R05:
+The initial source review is complete. Remaining detailed methods work is
+assigned to later tasks in the closeout audit:
 
-- [ ] **Few-shot tabular target adaptation:** find directly relevant recent work
-      on pretrained tabular context adaptation, fine-tuning, and real-only versus
-      synthetic-plus-real comparisons. Use implemented model papers as starting
-      points, not as the entire adaptation literature.
-- [ ] **Closest artifact-aware mitigation methods:** search for tabular
-      domain-aware feature/context selection and density-ratio/sample weighting;
-      compare to ordinary feature selection and random controls. This is the key
-      search needed to justify R06.
+- [x] **Few-shot tabular target adaptation:** compare selected primary work on
+      fine-tuning, context selection, and real-only versus synthetic-plus-real
+      evaluation in the reviewed drafts.
+- [x] **Mitigation precedents:** compare selected work on predictive-utility-aware
+      synthesis, context selection, covariate-shift learning, and removal with
+      retraining. Record the full-feature, matched-random, and source-predictive
+      controls for the proposed follow-up in the reviewed draft.
 - [x] **Proper scoring rules / Brier and log loss:** add a foundational source
       for their interpretation and the distinction between probability error
       and calibration alone: Gneiting and Raftery (2007),
       `gneiting2007properscoring`.
-- [ ] Read the scoring-rule source and write the project-specific metric
-      interpretation; adding the citation does not complete that review.
+- [x] Review scoring-rule interpretation in the approved
+      [shift and evaluation discussion](../paper/shift_and_evaluation_discussion.md).
 - [x] **Bootstrap and repeated-run foundations:** add Efron (1979),
       `efron1979bootstrap`, and Bouthillier et al. (2021),
       `bouthillier2021variance`.
@@ -148,6 +151,22 @@ The following source needs are still open; identifying them is part of R05:
 Evidence is in the [adaptation and mitigation review](r05_adaptation_mitigation_review.md).
 Detailed protocol checks and final paper citations remain open.
 
+### Reviewed related-work section
+
+- [x] Draft a coherent related-work section with citations supporting its claims.
+- [x] Check all 18 citation keys against the current bibliography.
+- [x] Connect the selected literature to Candidate A and the bounded Candidate B.
+- [x] Record Ryan Dozier's approval on November 9, 2026. Prepared with AI assistance.
+- [x] Complete the reviewed shift/metric discussion and planning-stage
+      claim/version audit; see the [closeout record](r05_closeout_audit.md).
+- [ ] Revisit the section after experiments and final scope decisions.
+
+Evidence is in the [related-work draft](../paper/related_work_draft.md).
+The approved [shift and evaluation discussion](../paper/shift_and_evaluation_discussion.md)
+covers covariate/label-shift assumptions, ROC/PR/AP, and probability quality.
+Detailed measurement work belongs to D07; uncertainty-protocol decisions belong
+to E05. Final paper placement and post-results revision belong to F02.
+
 ## 4. Optional background: does not expand implementation scope
 
 - SAINT: [paper](https://arxiv.org/abs/2106.01342). Read/cite if explaining its
@@ -166,7 +185,7 @@ deferred, and this inventory does not select any additional model.
 
 ## 5. Record for each reviewed source
 
-- [x] Review and clean the current 40 BibTeX entries, including authors, titles,
+- [x] Review and clean the initial bibliography, including authors, titles,
       available venue/year/version metadata, DOI/stable URLs, entry types,
       duplicate keys, and formatting.
 - [x] Save the current paper, technical-report, model-card, dataset/codebook,
@@ -174,13 +193,13 @@ deferred, and this inventory does not select any additional model.
 - [ ] Verify bibliographic metadata for any further sources selected during
       reading; finish missing dataset publication metadata and any exact
       software/checkpoint revision citations required by final claims.
-- [ ] Write 2–4 sentences on the supported claim, method, data/evaluation scope,
+- [x] Record supported claims, methods, data/evaluation scope,
       limitations, and relevance to an R04 question.
-- [ ] Record how it differs from our proposed intervention; identify missing
+- [x] Compare the selected studies with our proposed intervention; identify missing
       comparisons and assumptions rather than declaring novelty from a title.
-- [ ] Track reading/review ownership and actual access dates. Today's inventory
-      date is not the datasets' original download date.
-- [ ] Add the citation to the exact claim it supports in the report/design.
+- [x] Record Ryan Dozier\'s review ownership and approval dates in the closeout.
+      Existing access dates are preserved; original download evidence remains D07.
+- [x] Add citations to the supported claims in the reviewed related-work draft.
       Repository hashes, cohort counts, and experimental outcomes require our
       own artifact/code evidence in addition to external citations.
 - [ ] Record current model-weight and dataset conditions separately from the
@@ -196,10 +215,11 @@ is prepared, and the research gap informs R06. A list of URLs alone is insuffici
 Bibliography sourcing and cleanup: Ryan Dozier, with AI assistance.
 Completed checkboxes record sourcing work; they do not imply the papers were read.
 
-The bibliography now includes the TabPFN-3.5 report/model card, all 14 component
-codebooks referenced by the NHANES preparation script, the CDC analytic-guidelines
-index, Failing Loudly, and sources on fine-tuning, discriminative covariate-shift
-adaptation, proper scoring rules, bootstrap foundations, and benchmark variance.
+The October 30 sourcing pass included component codebooks and CDC guidelines.
+Those entries were later streamlined; the current bibliography retains the main
+NHANES citation. Component documentation remains linked above for D07.
+The model, adaptation, shift, probability-score, and uncertainty sources remain
+available. See the closeout audit for the current entry count.
 
 Additional reading candidates are rubachev2025finetuning (TabPFNv2 fine-tuning;
 not evidence of synthetic-to-NHANES few-shot transfer) and bickel2009covariateshift
@@ -207,8 +227,7 @@ not evidence of synthetic-to-NHANES few-shot transfer) and bickel2009covariatesh
 artifact-specific tabular mitigation method). The scoring-rule, bootstrap, and
 benchmark-variance sources provide starting points, not a final E05 protocol.
 
-Adding entries does not complete the unchecked reading, mapping-audit, novelty,
-or protocol tasks above. The closest artifact-aware tabular mitigation literature,
-feature-statistic citations, and method-specific sources still need selection as
-R06/E05/X01 develop. Cite component codebooks according to the actual cohort and
+The reviewed drafts complete the initial literature synthesis. Detailed mapping,
+feature-statistic documentation, and method-specific citations remain attached to
+the later tasks named in the closeout audit; R06 will formalize the contribution. Cite component codebooks according to the actual cohort and
 retained measurements. TRIGLY_I is relevant to lipid sensitivity analyses.

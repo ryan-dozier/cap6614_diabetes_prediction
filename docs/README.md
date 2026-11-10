@@ -30,8 +30,13 @@ Design decisions and implementation-stage acceptance records. Historical section
 retain their original scope; use each document's current-status notes.
 
 - [Research questions and hypotheses — approved (R04)](plans/research_questions.md)
-- [Source and citation inventory — in progress (R05)](plans/r05_source_inventory.md)
-- [Implemented-model comparison — draft for review (R05)](plans/r05_model_comparison.md)
+- [Source and citation inventory — planning review complete (R05)](plans/r05_source_inventory.md)
+- [Implemented-model comparison — reviewed (R05)](plans/r05_model_comparison.md)
+- [Adaptation and mitigation review](plans/r05_adaptation_mitigation_review.md)
+- [R05 closeout and follow-up audit](plans/r05_closeout_audit.md)
+- [Related-work draft — reviewed](paper/related_work_draft.md)
+- [Shift and evaluation discussion — reviewed](paper/shift_and_evaluation_discussion.md)
+
 - [FT-Transformer integration plan](plans/ft_transformer_integration_plan.md)
 - [TabICL integration plan](plans/tabicl_integration_plan.md)
 

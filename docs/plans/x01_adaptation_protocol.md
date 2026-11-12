@@ -1,15 +1,15 @@
 # X01: NHANES adaptation protocol
 
 Prepared: November 12, 2026.
-Status: **In progress; Candidate A matrix and five-repetition plan approved by Ryan Dozier on November 12, 2026.**
+Status: **Implementation specification approved by Ryan Dozier on November 12, 2026; E05 and Newton feasibility gates remain open.**
 Prepared with AI assistance. No adaptation samples or experiments have been
 created by this planning update.
 
 This working plan implements Candidate A from the
 [approved contribution](r06_research_contribution.md).
-The full protocol is not yet frozen: exact sampling implementation,
-training-selection settings, evaluation/output details, and E05 uncertainty
-choices remain open. Repetition count and root seeds are approved.
+The matrix, seed policy, deterministic sampling specification, model-selection
+settings, and evaluation/output specification are approved. Implementation is
+not yet completed. E05 uncertainty choices and Newton feasibility remain open.
 
 ## 1. Agreed initial scope
 
@@ -59,8 +59,8 @@ participants drawn only from the existing validation partition.
 | 1,000 | 800 | 200 | 32 |
 
 Approximate positive counts illustrate feasibility, not frozen class quotas.
-X01 must specify the deterministic allocation/rounding rule and verify actual
-counts before creating manifests. Preserve approximate partition class
+Section 9.1 specifies the approved deterministic allocation/rounding rule;
+implementation must verify actual counts before creating manifests. Preserve approximate partition class
 proportions; do not artificially balance the samples to 50/50.
 
 Within each budget and repetition:
@@ -106,8 +106,8 @@ evaluation cohorts because all runs share the fixed test participants.
 
 Five repetitions use root seeds 42, 43, 44, 45, and 46. Use each repetition\'s
 root seed for model randomness and derive separate deterministic sampling streams
-for real fitting, validation, Original Synthetic, and Playground. Exact stream
-mapping, class quotas, and shuffle/order rules remain to be finalized. The implementation must preserve
+for real fitting, validation, Original Synthetic, and Playground. The approved stream
+mapping, class quotas, and shuffle/order rules are specified in Section 9.1. The implementation must preserve
 nesting while meeting those quotas rather than independently sampling every
 budget and assuming the subsets are nested.
 
@@ -131,7 +131,7 @@ Within each repetition, sample a stratified 2,000-row pool from each source's
 canonical training partition. Share each pool across all four models and take
 nested stratified 1,800/1,600/1,200-row subsets. Preserve source class proportions,
 rather than forcing equal classes. Change the sampled pools across repetitions.
-Exact class allocations and deterministic ordering remain to be specified.
+Section 9.1 specifies class allocation and deterministic ordering.
 
 The mixed-versus-real-only contrast measures augmentation; mixed-versus-synthetic
 at the same 2,000-row total measures replacement. Reuse the same predictions for
@@ -192,19 +192,20 @@ This manifest is a planned X02 implementation artifact. It does not exist yet.
 - [x] Define stratified source pools, nested subsets, and anchor reuse across budgets.
 - [x] Approve five repetitions with root seeds 42–46 and no separate model-seed sweep.
 - [x] Record the 220-run Candidate A matrix and defer Candidate B.
-- [ ] Freeze exact synthetic ordering and checks for historical anchor equivalence.
-- [ ] Freeze exact class allocations, seed derivation, and ordering/nesting algorithm.
-- [ ] Specify model-specific training caps, patience/checkpoint criteria, frozen
+- [x] Freeze exact synthetic ordering and checks for historical anchor equivalence.
+- [x] Freeze exact class allocations, seed derivation, and ordering/nesting algorithm.
+- [x] Specify model-specific training caps, patience/checkpoint criteria, frozen
       foundation-model settings, preprocessing, and source-validation access.
-- [ ] Confirm evaluation-domain coverage and artifact/run naming.
+- [x] Confirm evaluation-domain coverage and artifact/run naming.
 - [ ] Finalize paired uncertainty, multiplicity, and survey treatment with E05;
       repetition count and joint sampling/model variability policy are agreed.
 - [ ] Measure representative train/validation-only Newton workloads and finalize
       the feasible shared budget grid.
 - [ ] Review and approve the complete protocol before affected test evaluations.
 
-Next planning work: freeze deterministic sampling rules and the model-specific
-training/validation settings, then agree on the E05 analysis and Newton pilot.
+Next planning work: agree on the E05 analysis. X02 can implement the approved
+sampler, run matrix, and train/validation-only Newton pilot path. The pilot
+must precede final resource-based budget decisions and research test execution.
 
 ## 8. Amendment and review record
 
@@ -216,6 +217,149 @@ training/validation settings, then agree on the E05 analysis and Newton pilot.
 | 2026-11-12 | Ryan reviewed the initial draft and approved fixed 2,000-row mixtures and five repetitions, seeds 42–46 | Candidate A totals 220 planned runs; retain all models and reduce shared budgets first if necessary. |
 | 2026-11-12 | Defer Candidate B/RQ4 for now | Keep the course-project workload focused on Candidate A; no mitigation runs or completed RQ4 claim. |
 
+| 2026-11-12 | Ryan explicitly approved Section 9 | Deterministic sampling, model/source-validation settings, NHANES-only evaluation, and output specification accepted. E05 and Newton feasibility remain open. |
+
 Baseline test outcomes were already inspected during earlier project work.
 This prospective adaptation plan does not erase that exposure or make future
 runs on the same test participants independently confirmatory.
+
+## 9. Approved implementation specification
+
+Prepared November 12, 2026 after inspecting the existing sampler and four
+reference configurations. Ryan Dozier reviewed and approved this section on
+November 12, 2026. Approval covers the sampler, model/validation profiles, and
+evaluation/output policy; it does not imply completed implementation or pilot runs.
+
+### 9.1 Deterministic nested sampling
+
+Use a versioned algorithm named x01_nested_v1, separate from the existing
+select_training function. That function uses independent random choices and
+does not guarantee nesting across budgets.
+
+For each canonical input partition:
+1. Validate unique participant identities and binary labels; sort by identity.
+2. Compute the positive quota for requested size n using half-up proportional
+   rounding: floor(n * positive_population / population_size + 0.5).
+3. Constrain the quota to available class counts and require both classes.
+   Reject unsupported sizes rather than silently changing the requested size.
+4. Independently permute each class's identity-sorted rows once per repetition
+   and partition. Take class-wise prefixes of the required lengths for every
+   requested size. Verify that both class quotas are nondecreasing with size.
+5. Sort the selected rows by identity before passing them to a model.
+
+Proposed random-stream definition: NumPy default_rng initialized from
+SeedSequence([root_seed, stream_id, class_label]), with fixed stream IDs:
+0 = NHANES train; 1 = NHANES validation; 2 = Original Synthetic train;
+3 = Playground train. Record this mapping and NumPy version in the manifest.
+Do not use Python's process-dependent hash function or model-dependent streams.
+
+The existing NHANES counts yield these exact proposed quotas:
+
+| Budget | Fit negative | Fit positive | Validation negative | Validation positive |
+| --- | ---: | ---: | ---: | ---: |
+| 250 | 169 | 31 | 42 | 8 |
+| 500 | 337 | 63 | 84 | 16 |
+| 1,000 | 674 | 126 | 168 | 32 |
+
+For each synthetic source, compute quotas from its full canonical training
+partition for sizes 1,200, 1,600, 1,800, and 2,000. Use the same class-wise
+permutations for all sizes, making the smaller subsets contained in the anchor
+pool. Domain membership plus ID defines identity; equal numeric IDs from
+different datasets are not duplicate participants.
+
+For mixed inputs, use stable domain order (synthetic first, NHANES second),
+then ascending identity within each domain. Use that exact ordering across all
+models; FT-Transformer may subsequently shuffle batches under its recorded model
+seed. IDs and domain membership are provenance, never additional model features.
+
+The historical n2000 sampler differs from this algorithm. Do not assume its
+seed-42 results are reusable anchors. Default to new anchors; reuse only after
+sample/order and full protocol equivalence are demonstrated.
+
+### 9.2 Reuse existing model profiles
+
+Proposed policy: preserve the existing architectures, ensemble counts,
+preprocessing, and training hyperparameters. Change the input assignments,
+validation population, output location, and repetition seed for adaptation.
+
+| Model | Proposed frozen profile |
+| --- | --- |
+| CatBoost | CPU, four threads; depth 7; learning rate 0.05; at most 1,000 iterations; Logloss objective; AUC checkpoint selection; early-stopping wait 100 |
+| FT-Transformer | Three blocks, width 192, eight attention heads; existing ReGLU/dropout profile; AdamW learning rate 0.0001, weight decay 0.00001; training batch 256; at most 200 epochs; full permitted validation each epoch, batch 1,024; AUC checkpoint selection, patience 20, min_delta 0.001 |
+| TabPFN | Existing base v3.5 checkpoint/hash; four estimators; float32; fit_preprocessors; memory-saving enabled; query batch 1,024 |
+| TabICLv2 | Existing pinned v2 checkpoint/hash; eight estimators; none normalization; FP32; no AMP/FA3/KV cache; native ensemble batch one; CPU offloading; four preprocessing jobs; query batch 128 |
+
+FT inference query batch remains 256, matching its reference configuration.
+Preserve FT's distinction between selecting the highest raw validation AUC
+checkpoint and using min_delta for the patience counter. Report the actual
+selected/executed iterations or epochs. Retain existing no-class-weighting
+policies; no tuning grid or probability calibrator is added.
+
+Reference configurations:
+[CatBoost](../../configs/catboost_source_n2000.json),
+[FT-Transformer](../../configs/ft_transformer_source_n2000.json),
+[TabPFN](../../configs/tabpfn_source_n2000_float32_batch1024.json),
+[TabICLv2](../../configs/tabicl_v2_source_n2000_none_fp32.json).
+
+For real-only and mixed CatBoost/FT runs, use only the budgeted NHANES validation
+subset for selection, not source validation as well. For synthetic-only anchors,
+use the complete same-source validation partition, matching the established
+baseline selection policy; disclose these additional synthetic labels.
+Consequently, mixed-versus-anchor comparisons change validation domain/access
+for task-trained models as well as fitting composition. Describe them as
+pipeline adaptation contrasts, not isolated effects of replacing fitting rows.
+Frozen foundation-model anchors use no validation labels.
+
+Fit preprocessing only on the actual fitting/context rows for each condition.
+Do not fit scaling/category mappings on the full manifest pool, validation, or
+test data. No refit on fitting plus validation after selecting a checkpoint.
+
+Move checkpoint paths to the actual Newton location while preserving verified
+content hashes. Keep precision and batching fixed for the initial pilot.
+If execution settings need changes, document and validate them before final
+runs rather than silently mixing profiles.
+
+### 9.3 Evaluation and output proposal
+
+Evaluate Candidate A on the fixed 646-row NHANES test cohort only. Source and
+Playground test evaluation remain part of existing baseline work, not repeated
+across the adaptation matrix. This directly targets RQ3 and avoids the large
+synthetic-query workload. Candidate B is deferred.
+
+Save the existing metric suite: ROC-AUC (primary), AP, Brier, log loss,
+classification metrics at 0.5, and calibration summaries using the existing
+10-bin definition. E05 must finalize interpretation and uncertainty; do not
+select a winning condition or threshold from these test metrics.
+
+Proposed artifact root: results/adaptation/x01_v1/.
+Use a separate manifest folder and per-run folder names encoding model,
+condition (real_only, synthetic_only, mixed), source (none, source, kaggle),
+available target-label budget, synthetic count, and root seed. Examples:
+
+- ft_transformer_mixed_source_B500_S1600_seed42
+- tabicl_real_only_none_B250_S0_seed42
+- catboost_synthetic_only_kaggle_B0_S2000_seed42
+
+Record actual used label counts, fitting/context sizes, canonical split hashes,
+ordered participant identities, checkpoint/package versions, device, code
+revision, configuration, selected checkpoint, per-operation timing, completion
+status, and predictions keyed by NHANES participant ID. Do not overwrite existing
+runs; use separate execution roots for pilots and any revised protocol.
+
+Source label access must be recorded separately from NHANES label access.
+Retain adapter-supported persistence and identify any external checkpoint
+dependencies. Count the 220 unique runs from the manifest before execution.
+
+### 9.4 Review and remaining gates
+
+- [x] Accept the proposed prefix sampler, quotas, streams, and ordering.
+- [x] Accept reused model profiles and the disclosed source-validation policy
+      for synthetic-only task-trained anchors.
+- [x] Accept NHANES-only Candidate A evaluation and the output convention.
+- [ ] Complete E05's paired uncertainty/reporting specification.
+- [ ] Validate feasibility on Newton and freeze the final shared budget grid.
+
+X02 can implement the approved protocol and a train/validation-only pilot path.
+Final research test evaluation must wait for protocol and E05 approval.
+A pilot requiring new sampling/runner support is not a reason to claim that the
+full experiment protocol or research execution has already been completed.

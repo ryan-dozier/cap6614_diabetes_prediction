@@ -1,7 +1,7 @@
 # X01: NHANES adaptation protocol
 
 Prepared: November 12, 2026.
-Status: **Implementation specification approved by Ryan Dozier on November 12, 2026; E05 and Newton feasibility gates remain open.**
+Status: **Implementation specification approved by Ryan Dozier on November 12, 2026; E05 documented; Newton feasibility gate remains open.**
 Prepared with AI assistance. No adaptation samples or experiments have been
 created by this planning update.
 
@@ -9,7 +9,7 @@ This working plan implements Candidate A from the
 [approved contribution](r06_research_contribution.md).
 The matrix, seed policy, deterministic sampling specification, model-selection
 settings, and evaluation/output specification are approved. Implementation is
-not yet completed. E05 uncertainty choices and Newton feasibility remain open.
+not yet completed. The approved [E05 evaluation protocol](e05_evaluation_protocol.md) specifies analysis. Newton feasibility remains open.
 
 ## 1. Agreed initial scope
 
@@ -152,8 +152,8 @@ protocol/configuration and sample-identity equivalence; no reuse is assumed here
 Varying sample draws and model randomness together measures combined run-to-run
 variability. There is no separate model-seed sweep and no claim to isolate those
 variance sources. All repetitions share the fixed test participants; five repeats
-do not create five independent evaluation cohorts. E05 still needs to specify
-paired effects and test-sample uncertainty.
+do not create five independent evaluation cohorts. The [E05 protocol](e05_evaluation_protocol.md) specifies paired effects and
+test-sample uncertainty.
 
 Newton timing will validate feasibility. If two positive budgets are retained
 instead of three, the same four models and five repetitions require 160 runs.
@@ -197,13 +197,13 @@ This manifest is a planned X02 implementation artifact. It does not exist yet.
 - [x] Specify model-specific training caps, patience/checkpoint criteria, frozen
       foundation-model settings, preprocessing, and source-validation access.
 - [x] Confirm evaluation-domain coverage and artifact/run naming.
-- [ ] Finalize paired uncertainty, multiplicity, and survey treatment with E05;
+- [x] Document paired uncertainty, multiplicity, and survey scope in E05;
       repetition count and joint sampling/model variability policy are agreed.
 - [ ] Measure representative train/validation-only Newton workloads and finalize
       the feasible shared budget grid.
 - [ ] Review and approve the complete protocol before affected test evaluations.
 
-Next planning work: agree on the E05 analysis. X02 can implement the approved
+Next work: implement the approved X01/E05 specifications. X02 can implement the
 sampler, run matrix, and train/validation-only Newton pilot path. The pilot
 must precede final resource-based budget decisions and research test execution.
 
@@ -328,7 +328,7 @@ synthetic-query workload. Candidate B is deferred.
 
 Save the existing metric suite: ROC-AUC (primary), AP, Brier, log loss,
 classification metrics at 0.5, and calibration summaries using the existing
-10-bin definition. E05 must finalize interpretation and uncertainty; do not
+10-bin definition. Follow the approved E05 interpretation and uncertainty policy; do not
 select a winning condition or threshold from these test metrics.
 
 Proposed artifact root: results/adaptation/x01_v1/.
@@ -356,10 +356,12 @@ dependencies. Count the 220 unique runs from the manifest before execution.
 - [x] Accept reused model profiles and the disclosed source-validation policy
       for synthetic-only task-trained anchors.
 - [x] Accept NHANES-only Candidate A evaluation and the output convention.
-- [ ] Complete E05's paired uncertainty/reporting specification.
+- [x] Complete E05's paired uncertainty/reporting specification; see the
+      [approved analysis protocol](e05_evaluation_protocol.md).
 - [ ] Validate feasibility on Newton and freeze the final shared budget grid.
 
 X02 can implement the approved protocol and a train/validation-only pilot path.
-Final research test evaluation must wait for protocol and E05 approval.
+Final research test evaluation must wait for Newton feasibility/final budget
+freeze and validated execution/reporting paths. E05 planning is approved.
 A pilot requiring new sampling/runner support is not a reason to claim that the
 full experiment protocol or research execution has already been completed.

@@ -286,3 +286,17 @@ measured HPC feasibility.
 | 2026-11-10 | Added provisional full-model coverage target and Newton timing gate following discussion | Planning proposal; no pilot or final matrix approved/executed |
 
 | 2026-11-12 | Recorded Ryan\'s decision to retain all four Candidate A models and reduce the shared budget grid first if compute is constrained | Final R06 scope issue resolved; R06 complete; X01/E05 remain pending |
+
+## November 12, 2026: Candidate A scope update
+
+Ryan approved fixed 2,000-row mixed fitting/context sets, five repetitions with
+root seeds 42–46, and all four models across the initial 250/500/1,000-label grid:
+220 Candidate A runs, subject to Newton feasibility. See the
+[X01 working protocol](x01_adaptation_protocol.md) for allocations and pending details.
+
+Candidate B/RQ4 is deferred for now, not completed, and excluded from immediate
+implementation and execution scope. Earlier descriptions of the bounded follow-up
+are retained as historical design, not active commitments. This scope reduction
+prioritizes the course-project workload; no Candidate B outcomes informed it.
+Baseline test outcomes were previously inspected; no adaptation experiments
+were run as part of this documentation update.

@@ -35,6 +35,7 @@ retain their original scope; use each document's current-status notes.
 - [Adaptation and mitigation review](plans/r05_adaptation_mitigation_review.md)
 - [R05 closeout and follow-up audit](plans/r05_closeout_audit.md)
 - [Research contribution and scope — approved (R06)](plans/r06_research_contribution.md)
+- [NHANES adaptation protocol — in progress (X01)](plans/x01_adaptation_protocol.md)
 - [Related-work draft — reviewed](paper/related_work_draft.md)
 - [Shift and evaluation discussion — reviewed](paper/shift_and_evaluation_discussion.md)
 

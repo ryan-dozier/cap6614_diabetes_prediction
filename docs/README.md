@@ -10,6 +10,7 @@ Instructions for current workflows:
 
 - [Environment setup and maintenance](guides/environment_setup.md)
 - [Data preparation, provenance, and analysis](guides/data_and_analysis.md)
+- [Data provenance and measurement appendix (D07)](paper/data_provenance_and_measurement_appendix.md)
 - [Shared predictive experiments and artifacts](guides/predictive_experiments.md)
 - [FT-Transformer usage](guides/ft_transformer_usage.md)
 - [TabPFN usage](guides/tabpfn_usage.md)

@@ -33,6 +33,8 @@ domain_feature_ablation.py
 
 ## Raw data and provenance
 
+See the [data provenance and measurement appendix](../paper/data_provenance_and_measurement_appendix.md) for dataset licenses, file identities, NHANES mappings, cohort selection, and cross-domain comparability limits.
+
 A normal clone includes both required synthetic CSVs. The acquisition links below are
 provenance and recovery references if a required file is missing:
 

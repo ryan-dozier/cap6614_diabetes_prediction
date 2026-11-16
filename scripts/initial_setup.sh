@@ -18,7 +18,8 @@ echo "========================================"
 echo
 echo "Checking environment..."
 
-if [ "${CONDA_DEFAULT_ENV:-}" != "$EXPECTED_ENV" ]; then
+ACTIVE_ENV="${CONDA_DEFAULT_ENV:-}"
+if [ "${ACTIVE_ENV##*/}" != "$EXPECTED_ENV" ]; then
     echo "ERROR: Incorrect Conda environment."
     echo
     echo "Current environment:"

@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-import hashlib
 from dataclasses import dataclass
-from typing import Any, Iterable
+from typing import Any
 
 import numpy as np
 import pandas as pd
 
 from src.experiments.config import positive_integer
+from src.experiments.identity import identity_fingerprints
 from src.experiments.metrics import binary_labels
 
 
@@ -18,17 +18,6 @@ class Partition:
     provenance: pd.DataFrame
     identities: frozenset[tuple[str, int]]
     summary: dict[str, Any]
-
-
-def identity_fingerprints(domain: str, identity_column: str, values: Iterable[int]) -> dict[str, str]:
-    identity_lines = [
-        f"{domain}\t{identity_column}\t{int(value)}\n"
-        for value in values
-    ]
-    return {
-        "identity_sha256": hashlib.sha256("".join(sorted(identity_lines)).encode()).hexdigest(),
-        "ordered_identity_sha256": hashlib.sha256("".join(identity_lines).encode()).hexdigest(),
-    }
 
 
 def partition_summary(

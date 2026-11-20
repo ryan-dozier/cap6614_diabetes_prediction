@@ -179,7 +179,28 @@ Validation requirements:
 - All paired model/source conditions use identical real assignments and ordering.
 - Recreating the manifest with the same inputs and seed reproduces assignments.
 
-This manifest is a planned X02 implementation artifact. It does not exist yet.
+X02 Stage 2A implements this assignment manifest, not fitting or evaluation.
+From the repository root, using the existing project environment:
+
+```bash
+python -m src.experiments.adaptation_manifest generate --output-dir results/adaptation/x01_v1/manifest
+python -m src.experiments.adaptation_manifest validate --output-dir results/adaptation/x01_v1/manifest
+```
+
+Choose a new output directory; existing directories are never overwritten.
+`assignments.json` is deterministic and contains one shared assignment per
+seed/role/budget/domain, including zero-budget synthetic anchors. Use the same
+real assignments for every model and both mixed sources; anchors are reused
+across budgets. `metadata.json` records completion, timestamp, file hashes,
+code revision and software versions separately. Validation reconstructs every
+assignment from the current canonical files and checks the exact artifact and
+fingerprints. Input file hashes cover complete files as bytes; the loader parses
+labels only for the permitted train/validation rows, and uses split-assignment
+identities alone for test exclusion. It never loads test features or labels.
+Mixed-input provenance order is synthetic first and NHANES second, with ascending
+IDs within each domain; neither domain nor ID is a predictor. Generation does
+not run models or perform evaluation. Final feasibility and execution gates
+remain open.
 
 ## 7. Decisions required to complete X01
 

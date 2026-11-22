@@ -20,8 +20,8 @@ TABICL_CHECKPOINT="${TABICL_CHECKPOINT:-$PROJECT_DIR/checkpoints/tabicl/4dcd344e
 wave="${1:-}"
 
 case "$wave" in
-    first|timing-catboost|timing-ft_transformer|timing-tabpfn|timing-tabicl) ;;
-    *) echo "Usage: sbatch scripts/x02_newton_pilot.sbatch first|timing-MODEL" >&2; exit 2 ;;
+    first|full-training|timing-catboost|timing-ft_transformer|timing-tabpfn|timing-tabicl) ;;
+    *) echo "Usage: sbatch scripts/x02_newton_pilot.sbatch first|full-training|timing-MODEL" >&2; exit 2 ;;
 esac
 if [[ $# != 1 || -z "${SLURM_JOB_ID:-}" || "${SLURM_CPUS_PER_TASK:-}" != 4 ]]; then
     echo "Expected one wave, a Slurm job ID, and the approved four-CPU profile." >&2
@@ -61,6 +61,14 @@ if [[ "$wave" == first ]]; then
         tabicl_mixed_source_B250_S1800_seed42
     )
     query_size=64
+elif [[ "$wave" == full-training ]]; then
+    runs=(
+        catboost_mixed_kaggle_B1000_S1200_seed42
+        catboost_synthetic_only_kaggle_B0_S2000_seed42
+        ft_transformer_mixed_kaggle_B1000_S1200_seed42
+        ft_transformer_synthetic_only_kaggle_B0_S2000_seed42
+    )
+    query_size=446
 else
     model="${wave#timing-}"
     runs=(
@@ -141,7 +149,11 @@ for run in "${runs[@]}"; do
         --manifest-dir "$MANIFEST_DIR" --run-id "$run" --mode development
         --output-root "$root/runs" --query-size "$query_size")
     case "$run" in
-        catboost_*|ft_transformer_*) args+=(--training-cap 5) ;;
+        catboost_*|ft_transformer_*)
+            if [[ "$wave" != full-training ]]; then
+                args+=(--training-cap 5)
+            fi
+            ;;
         tabpfn_*) args+=(--checkpoint "$TABPFN_CHECKPOINT") ;;
         tabicl_*) args+=(--checkpoint "$TABICL_CHECKPOINT") ;;
     esac

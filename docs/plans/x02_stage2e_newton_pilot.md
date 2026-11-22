@@ -1,8 +1,14 @@
 # X02 Stage 2E: Newton pilot and resource assessment
 
-Status: **prepared, not executed or approved**. Newton model feasibility and
-the final protocol freeze remain pending. This is not authorization for research
-test execution. X02 and Stage 2E remain open.
+Status: **in progress; final feasibility and protocol freeze remain pending**.
+The transferred summaries show that all 28 existing Newton pilot runs completed
+successfully; their local artifact hashes were validated. Evidence is under
+`results/adaptation/x01_v1/development/stage2e_first_1225886/` and the four
+`stage2e_timing-*` roots (jobs 1225910, 1225888, 1225895, and 1225898).
+CatBoost and FT-Transformer training in those waves was capped at five
+iterations/epochs, leaving full training and early-stopping costs uncertain.
+This document adds one manually submitted full-training development wave; it is
+not authorization for research test execution. X02 and Stage 2E remain open.
 
 ## Verified setup (reported by Ryan)
 
@@ -37,16 +43,22 @@ record, not a basis for Newton timing estimates.
 ## Pilot design
 
 Each run uses seed 42, its exact Stage 2A assignments, approved X01 profiles,
-precision, and checkpoint hashes. Only task-trained models receive the existing
-development cap of five iterations/epochs. No fitting/context rows or permitted
-selection rows are downsampled. Each allocation runs sequentially and stops at
-the first failure. No pilot predictive metric may select configurations, models
-or budgets.
+precision, and checkpoint hashes. Existing pilot waves cap task-trained models
+at five iterations/epochs; the full-training wave applies no development cap.
+No fitting/context rows or permitted selection rows are downsampled. Each
+allocation runs sequentially and stops at the first failure. No pilot predictive
+metric may select configurations, models or budgets.
 
 | Wave | Runs | Purpose |
 | --- | --- | --- |
-| First, one job, 64 queries | CatBoost mixed Original B250; FT mixed Playground B250; TabPFN real-only B250; TabICL mixed Original B250 | Short integration and initial resource check across all four actual adapters, including both checkpoint loads and both synthetic sources. |
-| Later, one separate job per model, 446 queries | B1000 real-only and both mixed sources; B500 mixed Original; both synthetic-only anchors (six/model, 24 total) | Largest real fit and selection sizes; source differences at fixed 2,000 fit/context rows; intermediate size; source-only selection paths; longer-query inference. |
+| First, completed job 1225886, 64 queries | CatBoost mixed Original B250; FT mixed Playground B250; TabPFN real-only B250; TabICL mixed Original B250 | Short integration and initial resource check across all four actual adapters, including both checkpoint loads and both synthetic sources. |
+| Completed timing jobs 1225910/1225888/1225895/1225898, 446 queries | B1000 real-only and both mixed sources; B500 mixed Original; both synthetic-only anchors (six/model, 24 total) | Largest real fit and selection sizes; source differences at fixed 2,000 fit/context rows; intermediate size; source-only selection paths; longer-query inference. |
+| Full-training, one manual job, 446 queries | `catboost_mixed_kaggle_B1000_S1200_seed42`, `catboost_synthetic_only_kaggle_B0_S2000_seed42`, `ft_transformer_mixed_kaggle_B1000_S1200_seed42`, `ft_transformer_synthetic_only_kaggle_B0_S2000_seed42` | Measure normal training/early-stopping costs and the largest anchor validation workload. No development training cap; unchanged profiles permit up to 1,000 CatBoost iterations and 200 FT epochs. |
+
+The full-training wave retains the original manifest assignments, development
+mode, four-thread/resource profile, and early-stopping/checkpoint-selection
+rules. It does not tune models or supply research evidence. The synthetic-only
+Kaggle anchors retain the complete permitted 105,000-row validation population.
 
 `B250/B500/B1000` use 200/400/800 real fitting/context rows, with
 50/100/200 reserved validation rows and 1,800/1,600/1,200 synthetic rows in
@@ -54,50 +66,51 @@ mixed runs. Task-trained positive-budget runs select on those 50/100/200 rows;
 frozen models reserve but do not use them. Both task-trained synthetic anchors
 use the complete same-source validation partition: 15,000 Original and 105,000
 Playground rows as recorded in the existing assignments. FT evaluates it each
-epoch, so five epochs can mean 75,000 or 525,000 selection-row evaluations;
-actual counts and timing must come from the run. The anchors for both frozen
-models measure 2,000-row context construction and inference without selection.
+epoch, so the existing five-epoch runs can mean 75,000 or 525,000 selection-row
+evaluations; actual counts and timing must come from each run. The anchors for
+both frozen models measure 2,000-row context construction and inference without
+selection.
 The later wave contains both anchor sources for every model, but does not repeat
 every B250/B500 combination. Unsupported extrapolations remain uncertain.
 
 Queries are distinct permitted NHANES validation rows outside the run's reserved
 selection subset, with actual counts in `label_accounting`. At B1000 only
-646 - 200 = 446 such rows remain. First-wave queries are 64; later queries are
-446 even when more are available. No duplication simulates the 646-person test
-cohort. These development labels are additional supervision outside the
-research budget; artifacts are marked ineligible for research comparisons.
+646 - 200 = 446 such rows remain. First-wave queries are 64; later and
+full-training queries are 446 even when more are available. No duplication
+simulates the 646-person test cohort. These development labels are additional
+supervision outside the research budget; artifacts are marked ineligible for
+research comparisons.
 The validator and runner hash the whole canonical files as opaque bytes for
 integrity, including bytes belonging to test rows. Ryan explicitly allowed this
 integrity hashing; no test features or outcomes are parsed for the pilot, used
 for model fitting, selection, prediction, or metrics. Split identity metadata
 is also checked by the existing validator.
 
-The pilot measures actual capped fitting/context preparation, query inference,
-assembly, saving, metrics/artifact writing, host RSS, and available allocator
-peaks. Full training schedules, early-stopping behavior, 646-row inference,
-reload verification, full-grid reporting/bootstrap, retries, queue wait and
-concurrency are **not measured by these runs**. FT validation time is separated
-in its epoch history; CatBoost fit includes selection. Never infer the actual
-full-run stopping epoch from a five-epoch/iteration cap.
+The existing capped runs measure capped fitting/context preparation, query
+inference, assembly, saving, metrics/artifact writing, host RSS, and available
+allocator peaks. The full-training wave additionally measures normal training
+and early-stopping costs for its four configurations. 646-row inference, reload
+verification, full-grid reporting/bootstrap, retries, queue wait and
+concurrency remain **unmeasured**. FT validation time is separated in its epoch
+history; CatBoost fit includes selection. Never infer a full-run stopping point
+from the five-iteration/epoch cap.
 
-## Allocation and first submission
+## Allocation and full-training submission
 
-The batch file requests one H100, four CPUs, **64G RAM and one hour** for the
-first wave, with explicit account, QOS, partition and walltime. 64G is a
+The batch file requests one H100, four CPUs, **64G RAM and one hour by default**,
+with explicit account, QOS, partition and walltime. 64G is a
 precautionary starting request, not a measured sufficiency claim: large input
 assembly, foundation-model preprocessing and later full-source validation can
 exceed it. The one-hour limit bounds the first check, not an asserted runtime.
-Later timing jobs use the same resources but request **12 hours per model** as
-an unverified upper allocation; even this may be too short, particularly for
-FT's complete Playground selection path. Review first-wave evidence and cluster
-limits before deciding whether to submit later jobs or change resource requests.
-No CPU/GPU concurrency has been verified.
+The full-training wave uses the same resource profile and must be submitted with
+an explicit **12-hour walltime ceiling**. This is a precautionary allocation
+limit, not an estimated runtime. No CPU/GPU concurrency has been verified.
 
-After pushing/pulling the scripts, on Newton:
+After pushing/pulling the scripts, submit the new wave manually on Newton:
 
 ```bash
 cd /home/ry482284/cap6616/cap6614_diabetes_prediction
-sbatch scripts/x02_newton_pilot.sbatch first
+sbatch --time=12:00:00 scripts/x02_newton_pilot.sbatch full-training
 ```
 
 Record the job ID printed by `sbatch`. Default paths are those verified above.
@@ -116,7 +129,7 @@ directory. Results, per-run logs, `/usr/bin/time -v` outputs and `summary.json`
 are under:
 
 ```text
-results/adaptation/x01_v1/development/stage2e_first_<JOBID>/
+results/adaptation/x01_v1/development/stage2e_full-training_<JOBID>/
 ```
 
 Slurm's submission-directory `slurm-<JOBID>.out` captures early failures even
@@ -125,25 +138,13 @@ never reuse its output directory. Slurm timeout/OOM or node failure can prevent
 the exit trap or runner from writing final status; treat `running`, missing
 metadata, or absent summary as incomplete, not success.
 
-## Review gate and later submissions
+## Review gate
 
-Review the first job's exit, each adapter's actual fit/loading, resource use,
-failure diagnostics and any non-default environment before proceeding. After
-review and an explicit manual decision, submit the following individually; do
-not submit the entire set automatically:
-
-```bash
-sbatch --time=12:00:00 scripts/x02_newton_pilot.sbatch timing-catboost
-sbatch --time=12:00:00 scripts/x02_newton_pilot.sbatch timing-ft_transformer
-sbatch --time=12:00:00 scripts/x02_newton_pilot.sbatch timing-tabpfn
-sbatch --time=12:00:00 scripts/x02_newton_pilot.sbatch timing-tabicl
-```
-
-These are proposed timing jobs, not automatically approved after first-wave
-success. Use their distinct job IDs when retrieving evidence. The script runs
-the six listed conditions in order and aborts on the first failure. If evidence
-indicates likely timeout, OOM or unavailable cluster limits, revise the plan
-before submitting; retain failed evidence and rerun only in a new job directory.
+The full-training wave runs the four listed configurations sequentially and
+aborts on the first failure. Use its unique job ID to retrieve evidence; retain
+failed evidence and rerun only in a new job directory. Review the four results
+before updating feasibility estimates. Feasibility estimates, final freeze
+approval and Stage 2E completion remain pending until this wave is reviewed.
 
 ## Evidence retrieval
 
@@ -153,7 +154,7 @@ step-level MaxRSS. Accounting may be delayed or disabled:
 
 ```bash
 JOB=REPLACE_WITH_JOB_ID
-WAVE=first
+WAVE=full-training
 ROOT="results/adaptation/x01_v1/development/stage2e_${WAVE}_${JOB}"
 sacct -j "$JOB" --format=JobID,JobName%30,State,ExitCode,Elapsed,Timelimit,ReqTRES%80,AllocTRES%80,MaxRSS,MaxRSSNode,MaxRSSTask -P
 scontrol show job "$JOB"
@@ -185,11 +186,16 @@ it to standard output without overwriting evidence:
 
 The summary excludes predictive metrics and includes status/errors, actual
 query/selection label counts, per-operation and total seconds, artifact bytes,
-and runner resource metadata. CatBoost iteration counts are the highest
-zero-based iteration printed plus one, not the selected iteration or saved tree
-count; if the log lacks it, the count is null. FT records actual executed epochs,
-stopping reason and sum of per-epoch selection seconds. The five-iteration
-CatBoost cap is below patience 100, but the log is the execution evidence.
+and runner resource metadata. It explicitly reports whether a development cap
+was applied; `development_training_cap: null` with status `none` means no
+development cap. FT records actual executed epochs, selected epoch, stopping
+reason and sum of per-epoch selection seconds. CatBoost's selected iteration
+(zero-based) and saved tree count are separate from actual iterations executed.
+The summary reports CatBoost's actual count only when it is established by the
+successful completion of a cap below early-stopping patience or a logged final
+configured iteration; otherwise the count is null. Do not infer total CatBoost
+iterations from saved tree count. Missing or incomplete execution evidence means
+unavailable, not zero.
 `/usr/bin/time` MaxRSS is a per-process high-water measurement, not necessarily
 the summed memory of all children; `sacct` step MaxRSS is also not a guaranteed
 aggregate of concurrent processes. Blank, null, missing, unsupported or delayed
@@ -215,14 +221,13 @@ TabICL batch 128, and remainder batches rule out an unquestioned linear
 throughput assumption. Make conservative ranges for unmeasured B250/B500
 conditions and seed variability, with observed ranges and explicit margins.
 
-For capped task-trained fits, separate startup from observed epoch/iteration
-work where possible. Explore conservative maximum-profile scenarios up to
-CatBoost 1,000 iterations and FT 200 epochs, including selection each epoch,
-but label scaling as uncertain, not as measured stopping behavior or a firm
-upper bound. Obtain additional permitted development timing if needed rather
-than asserting a stopping point. Frozen-model costs are not multiplied by task
-training epochs. Add reporting/bootstrap, retry, failure and queue contingencies
-as separate estimates; they are currently unmeasured. Use observed artifact
+For task-trained fits, separate startup from observed epoch/iteration work where
+possible. The full-training wave measures the normal training/early-stopping
+cost for two CatBoost and two FT configurations, including the complete Kaggle
+anchor validation workload. These runs do not tune models or supply research
+evidence. Frozen-model costs are not multiplied by task training epochs. Add
+reporting/bootstrap, retry, failure and queue contingencies as separate
+estimates; they are currently unmeasured. Use observed artifact
 sizes for storage ranges, including predictions, logs, checkpoints, verification,
 reports and retained failures, and distinguish bytes per run from shared inputs.
 

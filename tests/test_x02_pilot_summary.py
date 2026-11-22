@@ -20,7 +20,11 @@ class PilotSummaryTests(unittest.TestCase):
                     "model": "catboost", "condition": "synthetic_only",
                     "source": "source", "budget": 0, "root_seed": 42,
                 },
-                "effective_configuration": {"development_training_cap": 5},
+                "effective_configuration": {
+                    "development_training_cap": 5,
+                    "early_stopping_rounds": 100,
+                    "model_params": {"iterations": 5},
+                },
                 "model": {"best_iteration": 1, "fitted_tree_count": 2},
                 "label_accounting": {"synthetic_selection_used": 15000, "query_labels_for_metrics": 64},
                 "operation_seconds": {"fit": 3.5},
@@ -34,6 +38,11 @@ class PilotSummaryTests(unittest.TestCase):
             result = summarize(root)
             completed, pending = result["runs"]
             self.assertEqual(completed["catboost_iterations_observed_in_log"], 5)
+            self.assertEqual(completed["training_iterations_executed"], 5)
+            self.assertEqual(completed["development_training_cap_status"], "applied")
+            self.assertEqual(completed["selected_iteration"], 1)
+            self.assertEqual(completed["saved_tree_count"], 2)
+            self.assertEqual(completed["stopping_reason"], "development_cap")
             self.assertEqual(completed["catboost_saved_trees"], 2)
             self.assertEqual(completed["time_max_rss_kib"], 12345)
             self.assertEqual(completed["time_elapsed"], "0:05.67")
@@ -56,7 +65,7 @@ class PilotSummaryTests(unittest.TestCase):
                     "budget": 500, "root_seed": 42,
                 },
                 "model": {"training": {
-                    "epochs_executed": 2, "stopping_reason": "max_epochs",
+                    "epochs_executed": 2, "best_epoch": 2, "stopping_reason": "max_epochs",
                     "training_history": [
                         {"validation_duration_seconds": 1.0}, {"validation_duration_seconds": 2.5},
                     ],
@@ -74,10 +83,46 @@ class PilotSummaryTests(unittest.TestCase):
             }))
             ft_result, failure = summarize(root)["runs"]
             self.assertEqual(ft_result["ft_epochs_executed"], 2)
+            self.assertEqual(ft_result["training_epochs_executed"], 2)
+            self.assertEqual(ft_result["selected_epoch"], 2)
+            self.assertEqual(ft_result["stopping_reason"], "max_epochs")
             self.assertEqual(ft_result["ft_validation_seconds"], 3.5)
             self.assertIsNone(ft_result["resources"])
             self.assertEqual(failure["status"], "failed")
             self.assertEqual(failure["error"]["message"], "fixture failure")
+
+    def test_uncapped_catboost_reports_execution_unavailable_not_saved_tree_count(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "plan.txt").write_text("catboost_full\n")
+            (root / "logs").mkdir()
+            run = root / "runs" / "catboost_full"
+            run.mkdir(parents=True)
+            (run / "metadata.json").write_text(json.dumps({
+                "run_id": "catboost_full", "mode": "development", "status": "completed",
+                "specification": {
+                    "model": "catboost", "condition": "synthetic_only",
+                    "source": "kaggle", "budget": 0, "root_seed": 42,
+                },
+                "effective_configuration": {
+                    "development_training_cap": None,
+                    "early_stopping_rounds": 100,
+                    "model_params": {"iterations": 1000},
+                },
+                "model": {"best_iteration": 43, "fitted_tree_count": 44},
+            }))
+            (root / "logs" / "catboost_full.log").write_text(
+                "0:\ttest: 0.5\n100:\ttest: 0.6\n200:\ttest: 0.7\n"
+                "Stopped by overfitting detector (100 iterations wait)\n"
+            )
+
+            result = summarize(root)["runs"][0]
+            self.assertEqual(result["development_training_cap_status"], "none")
+            self.assertIsNone(result["development_training_cap"])
+            self.assertIsNone(result["training_iterations_executed"])
+            self.assertEqual(result["selected_iteration"], 43)
+            self.assertEqual(result["saved_tree_count"], 44)
+            self.assertEqual(result["stopping_reason"], "early_stopping")
 
     def test_rejects_invalid_plan_and_run_identity(self):
         with tempfile.TemporaryDirectory() as tmp:

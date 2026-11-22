@@ -37,19 +37,59 @@ def summarize(root: Path) -> dict[str, Any]:
             training = model.get("training") or {}
             history = training.get("training_history") or []
             log_path = root / "logs" / f"{run_id}.log"
-            catboost_iterations = None
-            if spec["model"] == "catboost" and log_path.exists():
-                observed = re.findall(r"^(\d+):\s+test:", log_path.read_text(), re.MULTILINE)
+            log_text = log_path.read_text() if log_path.exists() else ""
+            catboost_iterations_observed = None
+            if spec["model"] == "catboost" and log_text:
+                observed = re.findall(r"^(\d+):\s+test:", log_text, re.MULTILINE)
                 if observed:
-                    catboost_iterations = max(map(int, observed)) + 1
+                    catboost_iterations_observed = max(map(int, observed)) + 1
+            development_cap = config.get("development_training_cap")
+            development_cap_status = (
+                "applied" if development_cap is not None
+                else "none" if "development_training_cap" in config
+                else "unavailable"
+            )
+            iterations_executed = None
+            if spec["model"] == "catboost" and metadata.get("status") == "completed":
+                model_params = config.get("model_params") or {}
+                max_iterations = model_params.get("iterations")
+                patience = config.get("early_stopping_rounds")
+                if (
+                    type(development_cap) is int
+                    and type(patience) is int
+                    and development_cap < patience
+                ):
+                    iterations_executed = development_cap
+                elif (
+                    type(max_iterations) is int
+                    and catboost_iterations_observed == max_iterations
+                ):
+                    iterations_executed = max_iterations
+            catboost_stopping_reason = None
+            if spec["model"] == "catboost":
+                if re.search(r"Stopped by overfitting detector", log_text, re.IGNORECASE):
+                    catboost_stopping_reason = "early_stopping"
+                elif metadata.get("status") == "completed" and iterations_executed is not None:
+                    catboost_stopping_reason = (
+                        "development_cap" if development_cap is not None else "max_iterations"
+                    )
             selection = metadata.get("label_accounting", {})
             item.update(
                 status=metadata.get("status", "unknown"),
                 error=metadata.get("error"),
                 model=spec["model"], condition=spec["condition"], source=spec["source"],
                 budget=spec["budget"], seed=spec["root_seed"],
-                training_cap=config.get("development_training_cap"),
-                catboost_iterations_observed_in_log=catboost_iterations,
+                training_cap=development_cap,
+                development_training_cap=development_cap,
+                development_training_cap_status=development_cap_status,
+                training_iterations_executed=iterations_executed,
+                training_epochs_executed=training.get("epochs_executed"),
+                selected_iteration=model.get("best_iteration") if spec["model"] == "catboost" else None,
+                selected_epoch=training.get("best_epoch"),
+                saved_tree_count=model.get("fitted_tree_count") if spec["model"] == "catboost" else None,
+                stopping_reason=training.get("stopping_reason") or catboost_stopping_reason,
+                catboost_stopping_reason=catboost_stopping_reason,
+                catboost_iterations_observed_in_log=catboost_iterations_observed,
                 catboost_best_iteration=model.get("best_iteration"),
                 catboost_saved_trees=model.get("fitted_tree_count"),
                 ft_epochs_executed=training.get("epochs_executed"),

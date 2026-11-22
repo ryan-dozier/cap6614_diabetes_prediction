@@ -152,6 +152,49 @@ class PilotBatchTests(unittest.TestCase):
             self.assertEqual(args[args.index("--query-size") + 1], "446")
         self.assertIn("synthetic_only_kaggle", calls[-1][calls[-1].index("--run-id") + 1])
 
+    def test_full_training_wave_uses_four_uncapped_runs_and_separate_output(self):
+        earlier = self.project / "results/adaptation/x01_v1/development/stage2e_timing-catboost_99"
+        earlier.mkdir(parents=True)
+        marker = earlier / "keep.txt"
+        marker.write_text("earlier evidence")
+
+        result = self.run_wave("full-training")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        calls = [json.loads(line) for line in self.calls.read_text().splitlines()]
+        expected = [
+            "catboost_mixed_kaggle_B1000_S1200_seed42",
+            "catboost_synthetic_only_kaggle_B0_S2000_seed42",
+            "ft_transformer_mixed_kaggle_B1000_S1200_seed42",
+            "ft_transformer_synthetic_only_kaggle_B0_S2000_seed42",
+        ]
+        self.assertEqual(
+            [args[args.index("--run-id") + 1] for args in calls],
+            expected,
+        )
+        for args in calls:
+            self.assertEqual(args[args.index("--mode") + 1], "development")
+            self.assertEqual(args[args.index("--query-size") + 1], "446")
+            self.assertNotIn("--training-cap", args)
+
+        root = self.project / "results/adaptation/x01_v1/development/stage2e_full-training_99"
+        self.assertEqual((root / "plan.txt").read_text().splitlines(), expected)
+        self.assertTrue(marker.exists())
+        self.assertNotEqual(root, earlier)
+        self.assertTrue(all((root / "runs" / run_id).is_dir() for run_id in expected))
+
+    def test_full_training_wave_failure_stops_and_keeps_nonzero_status(self):
+        result = self.run_wave("full-training", FAIL_FIRST="1")
+        self.assertEqual(result.returncode, 7, result.stdout + result.stderr)
+        calls = [json.loads(line) for line in self.calls.read_text().splitlines()]
+        self.assertEqual(len(calls), 1)
+        self.assertNotIn("--training-cap", calls[0])
+        root = self.project / "results/adaptation/x01_v1/development/stage2e_full-training_99"
+        summary = json.loads((root / "summary.json").read_text())
+        self.assertEqual(
+            [item["status"] for item in summary["runs"]],
+            ["failed", "not_started", "not_started", "not_started"],
+        )
+
     def test_first_wave_uses_all_models_and_pinned_path_overrides(self):
         result = self.run_wave("first")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

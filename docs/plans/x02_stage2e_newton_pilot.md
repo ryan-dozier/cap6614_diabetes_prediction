@@ -1,14 +1,12 @@
 # X02 Stage 2E: Newton pilot and resource assessment
 
-Status: **in progress; final feasibility and protocol freeze remain pending**.
-The transferred summaries show that all 28 existing Newton pilot runs completed
-successfully; their local artifact hashes were validated. Evidence is under
-`results/adaptation/x01_v1/development/stage2e_first_1225886/` and the four
-`stage2e_timing-*` roots (jobs 1225910, 1225888, 1225895, and 1225898).
-CatBoost and FT-Transformer training in those waves was capped at five
-iterations/epochs, leaving full training and early-stopping costs uncertain.
-This document adds one manually submitted full-training development wave; it is
-not authorization for research test execution. X02 and Stage 2E remain open.
+Status: **Complete; feasibility and execution freeze approved 2026-11-22.**
+All 28 initial runs and four normal-limit full-training runs completed. Job
+1231168 failed GPU preflight before training; retry 1231230 succeeded. See the
+[final feasibility assessment](../results/x02_stage2e_feasibility.md) and
+[approved freeze](x01_execution_freeze.json). The procedures below preserve the
+pilot plan; their submission commands remain development-only. X03 research
+execution has not begun.
 
 ## Verified setup (reported by Ryan)
 
@@ -239,8 +237,8 @@ measurements, not laptop-derived or fabricated Newton timings. If the measured
 workload is infeasible, retain all four models and propose reducing the shared
 budget grid first under R06, preserving anchors and repetitions where possible.
 Any reduction and its scientific consequences require a recorded decision
-before affected test evaluation. Freeze approval, final configuration/inventory,
-and research execution remain pending.
+before affected test evaluation. Freeze approval and final configuration/inventory are complete as recorded
+in the linked final assessment. Research execution remains pending.
 
 ## Local preparation checks
 

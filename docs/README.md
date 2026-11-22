@@ -17,6 +17,7 @@ Instructions for current workflows:
 - [TabICL setup and usage](guides/tabicl_usage.md)
 - [TabPFN inference benchmarking](guides/tabpfn_benchmark.md)
 - [Comparison reporting](guides/reporting.md)
+- [Candidate A research launch planning and Newton jobs (X03A)](guides/x03_research_execution.md)
 
 ## Workflow shortcuts
 

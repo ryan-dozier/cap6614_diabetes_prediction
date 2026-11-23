@@ -179,7 +179,28 @@ Validation requirements:
 - All paired model/source conditions use identical real assignments and ordering.
 - Recreating the manifest with the same inputs and seed reproduces assignments.
 
-This manifest is a planned X02 implementation artifact. It does not exist yet.
+X02 Stage 2A implements this assignment manifest, not fitting or evaluation.
+From the repository root, using the existing project environment:
+
+```bash
+python -m src.experiments.adaptation_manifest generate --output-dir results/adaptation/x01_v1/manifest
+python -m src.experiments.adaptation_manifest validate --output-dir results/adaptation/x01_v1/manifest
+```
+
+Choose a new output directory; existing directories are never overwritten.
+`assignments.json` is deterministic and contains one shared assignment per
+seed/role/budget/domain, including zero-budget synthetic anchors. Use the same
+real assignments for every model and both mixed sources; anchors are reused
+across budgets. `metadata.json` records completion, timestamp, file hashes,
+code revision and software versions separately. Validation reconstructs every
+assignment from the current canonical files and checks the exact artifact and
+fingerprints. Input file hashes cover complete files as bytes; the loader parses
+labels only for the permitted train/validation rows, and uses split-assignment
+identities alone for test exclusion. It never loads test features or labels.
+Mixed-input provenance order is synthetic first and NHANES second, with ascending
+IDs within each domain; neither domain nor ID is a predictor. Generation does
+not run models or perform evaluation. Final feasibility and execution gates
+remain open.
 
 ## 7. Decisions required to complete X01
 
@@ -365,3 +386,67 @@ Final research test evaluation must wait for Newton feasibility/final budget
 freeze and validated execution/reporting paths. E05 planning is approved.
 A pilot requiring new sampling/runner support is not a reason to claim that the
 full experiment protocol or research execution has already been completed.
+
+## 10. X02 Stage 2B: matrix and single-run execution
+
+The Stage 2B CLI validates the Stage 2A manifest against canonical inputs before
+building the matrix. It uses the naming examples in Section 9.3. From the
+repository root in the project environment:
+
+```bash
+# List the entire matrix as JSON, or add --export PATH to create a new file.
+python -m src.experiments.adaptation_runner matrix --manifest-dir results/adaptation/x01_v1/manifest
+
+# Assemble and verify one run without constructing an adapter.
+python -m src.experiments.adaptation_runner dry --manifest-dir results/adaptation/x01_v1/manifest \
+  --run-id catboost_mixed_source_B250_S1800_seed42
+
+# Later Stage 2C development smoke only; this command fits a real model.
+python -m src.experiments.adaptation_runner execute --manifest-dir results/adaptation/x01_v1/manifest \
+  --run-id catboost_mixed_source_B250_S1800_seed42 --mode development \
+  --output-root results/adaptation/x01_v1/development/stage2c --training-cap 5 --query-size 64
+
+# Inspect missing, running, failed, incomplete, incompatible, and completed runs.
+python -m src.experiments.adaptation_runner inventory --manifest-dir results/adaptation/x01_v1/manifest \
+  --mode development --output-root results/adaptation/x01_v1/development/stage2c
+```
+
+Development queries are the first requested ascending NHANES validation IDs
+outside the run's reserved validation subset. They are disjoint from fitting and
+selection, but their labels are development supervision outside the research
+budget. Pilot artifacts are labeled `development`, `research_comparison_eligible:
+false`, and stored under a separate root. Stage 2D reporting must reject them;
+the existing predictive reporting schema is not an adaptation-reporting path.
+Reduced training caps are recorded and allowed only in development. Run
+directories and exported files are never overwritten.
+
+Frozen models receive empty validation arguments; task-trained positive-budget
+runs use the budgeted NHANES validation subset, while task-trained anchors use
+the entire same-source validation partition. Synthetic-only anchors do not use
+NHANES fitting or selection labels. The runner does not refit after selection.
+The FT adapter's historical same-domain wording is generic; run metadata records
+the actual selection population and ordered provenance.
+
+For foundation models, `--checkpoint PATH` supplies a local checkpoint. Its
+content must match the pinned reference SHA-256, including TabPFN's
+`ece4d67eadfea42eb0e610df5189bea60cb7f31073d81e9c7a019b76eacf0be3`
+from the existing predictive run metadata; TabICL uses its adapter's pinned
+official hash. No downloads or automatic device fallback occur. `--device`
+permits an explicit device override for non-CatBoost models. Profiles are bound
+to the four reference configuration hashes; changes require an explicit
+protocol/implementation review.
+
+Research execution requires `--mode research`, an output root under
+`results/adaptation/x01_v1/research/`, and `--freeze PATH`. No approved freeze
+record exists yet. The future JSON record must contain `schema_version` =
+`x02_freeze_v1`, `status` = `approved`, `protocol_version` =
+`x01_candidate_a_v1`, `protocol_sha256` and `evaluation_protocol_sha256`
+(SHA-256 of this file and E05 respectively), `matrix_sha256` from the matrix
+command, nonempty `approved_by`, `approved_at`, `approval_reference`,
+`feasibility_decision`, and `feasibility_evidence`, an `approved_budgets` list,
+and `approved_run_ids` covering the complete shared grid for those budgets plus
+all anchors. The record is an operator-provided approval assertion, not a
+cryptographic signature. Do not construct it until the actual feasibility
+decision and approval exist. Research mode loads only the NHANES test cohort
+after this gate; final reporting and Stage 2C/2E validation remain separate gates.
+No historical anchor is implicitly reused.

@@ -43,7 +43,7 @@ export CONDA_ENVS_PATH="$HOME/projects/d08-newton/conda-envs-with-pytorch-index"
 export PYTHONNOUSERSITE=1
 unset PYTHONPATH PYTHONHOME
 
-PIP_EXTRA_INDEX_URL=[https://download.pytorch.org/whl/cu126](https://download.pytorch.org/whl/cu126) \
+PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cu126 \
 conda env create -f environment.yml
 ```
 

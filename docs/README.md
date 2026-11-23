@@ -17,6 +17,7 @@ Instructions for current workflows:
 - [TabICL setup and usage](guides/tabicl_usage.md)
 - [TabPFN inference benchmarking](guides/tabpfn_benchmark.md)
 - [Comparison reporting](guides/reporting.md)
+- [Candidate A research launch planning and Newton jobs (X03A)](guides/x03_research_execution.md)
 
 ## Workflow shortcuts
 
@@ -38,6 +39,7 @@ retain their original scope; use each document's current-status notes.
 - [Research contribution and scope — approved (R06)](plans/r06_research_contribution.md)
 - [NHANES adaptation protocol — in progress (X01)](plans/x01_adaptation_protocol.md)
 - [Evaluation and uncertainty protocol — planning complete (E05)](plans/e05_evaluation_protocol.md)
+- [X02 Stage 2E Newton pilot — completed](plans/x02_stage2e_newton_pilot.md)
 - [Related-work draft — reviewed](paper/related_work_draft.md)
 - [Shift and evaluation discussion — reviewed](paper/shift_and_evaluation_discussion.md)
 
@@ -62,3 +64,6 @@ existing output directories.
 
 See [PROJECT_CHECKLIST.md](../PROJECT_CHECKLIST.md) for ownership, contributions,
 commit/PR evidence, and remaining research tasks.
+
+- [X02 Newton feasibility and approval](results/x02_stage2e_feasibility.md)
+- [Approved X01 execution freeze](plans/x01_execution_freeze.json)

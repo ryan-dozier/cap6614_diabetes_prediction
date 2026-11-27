@@ -1,8 +1,9 @@
-# X03A: Candidate A research launch planning
+# X03: Candidate A research launch planning, resume, and retry
 
-X03A implements plan-only validation and four logical model jobs. **No research
-jobs or test evaluations were performed while preparing this launcher.** X03
-experiments remain pending; resume/retry handling is X03B.
+X03A implements plan-only validation and four logical model jobs; X03B adds
+validated resume, inventory classification, and explicit archive-before-retry.
+**No research jobs or test evaluations were performed while preparing this
+launcher.** X03 experiments remain pending.
 
 ## Scope and launch review
 
@@ -181,18 +182,133 @@ stops subsequent runs and propagates its nonzero exit status. Slurm timeout,
 OOM or node loss may prevent final status writing; missing/incomplete status
 is not success. Consult scheduler accounting and retained logs.
 
-## Existing outputs and X03B
+## Existing outputs, inventory, resume, and archive-before-retry (X03B)
 
-X03A reports selected outputs as `pending` or `existing` without reading their
-predictions/metrics. If any selected path already exists (including incomplete
-or failed runs), execution refuses the whole model job and lists affected IDs.
-Nothing is skipped, archived, deleted or overwritten. A file/symlink at an
-expected output path also blocks execution. Unexpected entries in the canonical
-collection are errors. Do not rerun a partially completed model job with X03A.
+Ordinary (non-resume) plans keep the safe default: any existing selected output
+refuses the whole model job and lists the affected IDs. Nothing is skipped,
+archived, deleted or overwritten. Recovery is explicit and split into three
+deliberate steps — inspect, archive (only if needed), then regenerate a resume
+plan — each separate from execution.
 
-X03B will extend this initial no-overwrite contract with validated inventory,
-completed-run provenance/integrity checks, explicit resume selection, and
-operator-approved retry/archive handling outside the canonical collection.
-Automatic skipping, retries, concurrent same-model launches and archival are
-not implemented here. Keep failed evidence until that recovery workflow is
-reviewed. X03 experiments and final E05 reporting remain pending.
+### Inventory and status inspection
+
+Classify every expected output location for one model without reading any
+prediction values:
+
+```bash
+"$PYTHON" -m src.experiments.adaptation_launch inventory "${COMMON[@]}" --model catboost
+```
+
+Statuses per run ID:
+
+- `pending`: missing; eligible to execute.
+- `verified_complete`: passes the full research artifact contract below;
+  eligible to skip under an explicit resume plan.
+- `failed` / `incomplete`: blocks execution until explicitly archived
+  (includes outputs still marked `running`; confirm the owning job ended first).
+- `incompatible`: corrupted or contract-violating; blocks with a per-run
+  reason and stays blocked for manual investigation.
+
+Before a completed run may be skipped it must pass, in order: the runner's
+inventory contract (exact run identity, research mode, approved specification,
+required artifacts present, every recorded artifact SHA-256 re-verified), then
+the deeper research checks mirrored from the reporting gate — current matrix
+fingerprint, exact approved-freeze match, canonical source/split fingerprints,
+run-specification artifact equality, effective scientific configuration equal to
+the approved profile (no training cap), pinned checkpoint fingerprints for
+foundation models, approved feature order, fit/selection/query participant
+provenance re-derived from the manifest and canonical test identities, and
+label accounting. Prediction *values* are never parsed for resume decisions:
+their bytes are integrity-covered by the verified recorded hashes, and the
+final reporting gate revalidates prediction contents. Launcher commits are
+recorded but not required to match across completed runs; only the frozen
+scientific contracts gate compatibility. Unexpected entries in the canonical
+run collection remain errors.
+
+### Resume-plan generation
+
+```bash
+"$PYTHON" -m src.experiments.adaptation_launch plan "${COMMON[@]}" \
+  --model catboost --resume \
+  --export "$PLAN_DIR/catboost_resume_$(date +%Y%m%dT%H%M%S).json"
+```
+
+A resume plan retains the full 55-run model scope and records, per run ID, the
+verified-complete runs to skip (with their pinned metadata fingerprints), the
+missing runs to execute, and any blocking IDs with reasons. An invalid existing
+run is never silently reclassified as missing. Submission uses the same batch
+wrappers with the resume-plan file. Execution revalidates by reconstructing the
+entire plan against current inputs and output state: changed completed-run
+evidence, newly appeared pending outputs, changed scientific inputs/code, or
+changed commands make the plan stale and refuse execution. Any blocked ID also
+refuses execution. If every selected run is verified complete, the job is an
+explicit recorded no-op (`status.json` has `no_op: true`) and invokes no model
+or preflight command.
+
+During execution, each pending run keeps the X03A per-run fingerprint and
+output-absence rechecks, and the runner's exclusive-creation/no-overwrite
+behavior. A zero subprocess exit is not success: each newly finished run is
+verified against the same artifact contract before the job continues, and
+`status.json` distinguishes `skipped_verified_run_ids`, `completed_run_ids`
+(new this job), `invalid_run_ids`, `remaining_run_ids`, and `current_run_id`.
+Concurrent same-model execution, or archival while a job is running, is
+unsupported; run one job per model at a time.
+
+### Inspecting blocked runs
+
+Read the inventory output or the resume plan's `blocking_reason` fields; the
+plan summary also lists a `blocked` map. For a failed run, consult the retained
+per-run log, `.time` file, and `metadata.json` error before deciding anything:
+
+```bash
+jq '.runs[] | select(.status != "pending" and .status != "verified_complete")' inventory.json
+```
+
+### Explicit archive-before-retry
+
+Archival is a separate, deliberate operation; planning and resume never archive
+automatically. It requires exact run IDs, an explicit destination outside the
+canonical run collection, and a documented reason:
+
+```bash
+"$PYTHON" -m src.experiments.adaptation_launch archive \
+  --manifest-dir "$PWD/results/adaptation/x01_v1/manifest" \
+  --freeze "$PWD/docs/plans/x01_execution_freeze.json" \
+  --run-root "$PWD/results/adaptation/x01_v1/research/runs" \
+  --archive-dir "$PWD/results/adaptation/x01_v1/execution/archive/$(date +%Y%m%dT%H%M%S)" \
+  --reason "Job 123456 hit its walltime ceiling during this run; retrying unchanged inputs." \
+  --run-id catboost_mixed_source_B500_S1600_seed43
+```
+
+Each ID is validated against the approved matrix and canonical run root, and its
+state is rechecked immediately before moving. The operation refuses
+verified-complete runs, missing outputs, symlinks, unsafe paths, destinations
+inside the run collection, and existing destinations; nothing is deleted or
+overwritten, and the original artifacts move intact to `<archive-dir>/<run_id>`
+with a sibling `<run_id>.archive.json` recording the run ID, original and
+archive locations, reason, classification, timestamp, and available metadata
+provenance. Incompatible/corrupted outputs stay blocked for manual
+investigation unless `--allow-incompatible` records a deliberate, documented
+decision. Failed training commands are never retried automatically.
+
+### Regenerating a resume plan after archival
+
+Archival changes output state, so every earlier plan for that model is stale by
+design and will refuse execution. Generate and review a fresh resume plan (the
+archived run reappears as `pending`), then submit manually:
+
+```bash
+"$PYTHON" -m src.experiments.adaptation_launch plan "${COMMON[@]}" \
+  --model catboost --resume --export "$PLAN_DIR/catboost_resume_after_archive.json"
+sbatch scripts/x03_newton_cpu.sbatch "$PLAN_DIR/catboost_resume_after_archive.json"
+```
+
+### Final completion evidence
+
+A model job is finished when its `status.json` reports `completed` with no
+remaining/invalid runs, and `inventory` reports all 55 runs
+`verified_complete`. The 220-run grid is complete when all four models reach
+that state. Keep job logs, plans, accounting, and archives outside
+`research/runs/`. This launcher-level verification does not evaluate research
+outcomes; final E05 reporting separately revalidates predictions and remains a
+pending gate.
